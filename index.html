@@ -772,7 +772,7 @@ function getAiConfig(){try{const c=JSON.parse(localStorage.getItem('ai_config'))
 function saveAiConfig(endpoint,key,model){localStorage.setItem('ai_config',JSON.stringify({endpoint,key,model}))}
 
 function showSettings(){
-  const cfg=getAiConfig()||{endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o'};
+  const cfg=getAiConfig()||{endpoint:'https://api.siliconflow.cn/v1',key:'',model:'Qwen/Qwen3-VL-8B-Instruct'};
   modal(`<h3>⚙️ AI 接口设置</h3>
 <div class="fg"><label>接口地址</label><input id="s-ep" value="${eh(cfg.endpoint)}" placeholder="https://api.openai.com/v1" /></div>
 <div class="fg"><label>API Key</label><input id="s-key" value="${eh(cfg.key)}" placeholder="sk-..." type="password" /></div>
@@ -1144,15 +1144,14 @@ function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSector
 function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
-// 预置硅基流动 AI 配置（如未配置则写入默认值）
+// 预置硅基流动 AI 配置（强制更新为正确模型名）
 (function(){
-  if(!localStorage.getItem('ai_config')){
-    localStorage.setItem('ai_config', JSON.stringify({
-      endpoint: 'https://api.siliconflow.cn/v1',
-      key: 'sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw',
-      model: 'Qwen/Qwen2.5-VL-7B-Instruct'
-    }));
-  }
+  const existing = JSON.parse(localStorage.getItem('ai_config')||'{}');
+  localStorage.setItem('ai_config', JSON.stringify({
+    endpoint: existing.endpoint || 'https://api.siliconflow.cn/v1',
+    key: existing.key || 'sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw',
+    model: 'Qwen/Qwen3-VL-8B-Instruct'
+  }));
 })();
 renHome();startPoll();
 </script>
