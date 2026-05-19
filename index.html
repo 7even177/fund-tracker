@@ -91,6 +91,17 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
 .dp svg{width:80px;height:80px;opacity:.3}.dp p{color:var(--text2);font-size:16px}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:0}::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 @media(min-width:500px){.fl{max-width:500px;margin:0 auto}}
+.fl-wrap{background:var(--card);border-radius:12px;margin:0 12px 16px;overflow:hidden;box-shadow:var(--shadow)}
+.fl-row{display:flex;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
+.fl-row:last-child{border-bottom:none}
+.fl-row:active{background:var(--card2)}
+.fl-left{flex:1;min-width:0}
+.fl-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.fl-sub{font-size:12px;color:var(--text2);display:flex;gap:8px;align-items:center}
+.fl-right{text-align:right;margin-left:12px;flex-shrink:0}
+.fl-ret{font-size:15px;font-weight:600;margin-bottom:4px}
+.fl-pct{font-size:12px}
+.fl-more{padding:8px 4px 8px 12px;color:var(--text2);font-size:20px;cursor:pointer;flex-shrink:0;line-height:1}
 .tr2{color:var(--red)}.tg2{color:var(--green)}.ta2{color:var(--accent)}
 .mt8{margin-top:8px}.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mb16{margin-bottom:16px}
 
@@ -426,14 +437,32 @@ function renHome(){
   const tp=ta-tc,tpr=tc>0?tp/tc*100:0,tdr=ta>0?tdpVal/ta*100:0;
   document.getElementById('ta').textContent=fmt(ta);
   setT('tp',tp);setT('tpr',tpr,'%');setT('tdp',tdpVal);setT('tdpr',tdr,'%');
-  let h='';
-  fs.forEach(f=>{
-    const n=f.gsz||f.nav||0,co=f.investAmount??(f.shares||0)*(f.cost||0);
-    const mv=co/(f.cost||n||1)*n,p=mv-co,pr=co>0?p/co*100:0,gs=f.gszzl||0;
-    const hd=f.addDate?Math.floor((Date.now()-new Date(f.addDate))/864e5):0;
-    h+=`<div class="fc" onclick="goDetail('${f.code}')"><div class="top"><div><div class="nm">${eh(f.name||f.code)}</div><div class="cd">${f.code}</div></div><div class="rt"><div class="pf ${cc(p)}">${p>=0?'+':''}¥${fmt(p)}</div><div class="pr ${cc(pr)}">${fp(pr)}</div></div></div><div class="mid"><div class="mi"><span class="lb">当日估算</span><span class="vl ${cc(gs)}">${gs>=0?'+':''}${fmt(gs)}%</span></div><div class="mi"><span class="lb">持有天数</span><span class="vl">${hd}天</span></div><div class="mi"><span class="lb">持有金额</span><span class="vl">¥${fmt(co)}</span></div><div class="mi"><span class="lb">持有市值</span><span class="vl">¥${fmt(mv)}</span></div></div><div class="bt"><span class="ni">净值 ${fmt(f.nav||0)} ${f.gztime?'('+f.gztime+')':''}</span><div class="acts"><button class="bs" onclick="event.stopPropagation();showBuy('${f.code}')">加仓</button><button class="bs" onclick="event.stopPropagation();showSell('${f.code}')">减仓</button><button class="bs" onclick="event.stopPropagation();showXfer('${f.code}')">转换</button><button class="bs" onclick="event.stopPropagation();showSip('${f.code}')">定投</button></div></div></div>`;
-  });
-  document.getElementById('fl').innerHTML=h;
+  const fundsHtml = `<div class="fl-wrap">${fs.map(f=>{
+    const nav = f.gsz||f.nav||0;
+    const mv = nav>0 ? f.shares*nav : 0;
+    const ret = mv>0&&f.investAmount>0 ? mv-f.investAmount : null;
+    const retPct = ret!==null&&f.investAmount>0 ? ret/f.investAmount*100 : null;
+    const chgStr = f.gszzl!=null ? `${f.gszzl>0?'+':''}${f.gszzl.toFixed(2)}%` : '--';
+    const chgColor = f.gszzl==null?'var(--text2)':(f.gszzl>=0?'var(--red)':'var(--green)');
+    const retColor = ret===null?'var(--text2)':(ret>=0?'var(--red)':'var(--green)');
+    const retStr = ret!==null ? `${ret>=0?'+':''}¥${Math.abs(ret).toFixed(2)}` : '--';
+    const retPctStr = retPct!==null ? `${retPct>=0?'+':''}${retPct.toFixed(2)}%` : '';
+    return `<div class="fl-row" onclick="goDetail('${f.code}')">
+  <div class="fl-left">
+    <div class="fl-name">${eh(f.name||f.code)}</div>
+    <div class="fl-sub">
+      <span style="color:var(--text2)">¥${(f.investAmount||0).toFixed(2)}</span>
+      <span style="color:${chgColor}">${chgStr}</span>
+    </div>
+  </div>
+  <div class="fl-right">
+    <div class="fl-ret" style="color:${retColor}">${retStr}</div>
+    <div class="fl-pct" style="color:${retColor}">${retPctStr}</div>
+  </div>
+  <span class="fl-more" onclick="showFundMenu(event,'${f.code}')">⋯</span>
+</div>`;
+  }).join('')}</div>`;
+  document.getElementById('fl').innerHTML=fundsHtml;
 }
 function setT(id,v,pct){const e=document.getElementById(id);if(!e)return;const n=Number(v);e.textContent=(n>=0?'+':'')+fmt(n)+(pct?'%':'');e.className=(pct?'':'vl ')+cc(n)}
 
@@ -763,9 +792,22 @@ function showMore(){
 <button class="bs" style="width:100%;padding:12px;text-align:center" onclick="showSell('${f.code}');hModal()">减仓</button>
 <button class="bs" style="width:100%;padding:12px;text-align:center" onclick="showXfer('${f.code}');hModal()">转换</button>
 <button class="bs" style="width:100%;padding:12px;text-align:center" onclick="showSip('${f.code}');hModal()">定投</button>
-<button class="bs" style="width:100%;padding:12px;text-align:center;color:var(--red)" onclick="delFund('${f.code}')">删除基金</button></div>`);
+<button class="bs" style="width:100%;padding:12px;text-align:center;color:var(--red)" onclick="hModal();delFund('${f.code}')">删除基金</button></div>`);
 }
-function delFund(c){if(!confirm('确认删除此基金？所有数据将不可恢复。'))return;const d=ld();d.funds=d.funds.filter(f=>f.code!==c);sv(d);hModal();goHome()}
+function showFundMenu(e,code){
+  e.stopPropagation();
+  const d=ld(); const f=d.funds.find(x=>x.code===code); if(!f) return;
+  modal(`<h3>${f.name}</h3>
+<div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
+<button class="bc" onclick="hModal();showBuy('${code}')">➕ 加仓</button>
+<button class="bc" onclick="hModal();showSell('${code}')">➖ 减仓</button>
+<button class="bc" onclick="hModal();showXfer('${code}')">🔄 转换</button>
+<button class="bc" onclick="hModal();showSip('${code}')">📅 定投</button>
+<button style="width:100%;padding:12px;background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;cursor:pointer;font-size:14px;font-weight:600" onclick="hModal();delFund('${code}')">🗑️ 删除基金</button>
+<button class="bx" onclick="hModal()">取消</button>
+</div>`);
+}
+function delFund(code){if(!confirm('确认删除该基金？此操作不可恢复。'))return;const d=ld();d.funds=d.funds.filter(f=>f.code!==code);sv(d);renHome()}
 
 /* ===== AI Settings ===== */
 function getAiConfig(){try{const c=JSON.parse(localStorage.getItem('ai_config'));return c}catch(e){}return null}
