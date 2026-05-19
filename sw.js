@@ -1,8 +1,9 @@
-const CACHE="fund-tracker-v1";
-const ASSETS=["/fund-tracker/","/fund-tracker/index.html","/fund-tracker/manifest.json","/fund-tracker/icon-192.png","https://cdn.jsdelivr.net/npm/chart.js"];
-self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting()))});
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
-self.addEventListener("fetch",e=>{
-  if(e.request.url.includes("fundgz")||e.request.url.includes("eastmoney")||e.request.url.includes("codetabs"))return;
-  e.respondWith(fetch(e.request).then(resp=>{const clone=resp.clone();caches.open(CACHE).then(c=>c.put(e.request,clone));return resp}).catch(()=>caches.match(e.request)))
+const CACHE='fund-tracker-v2';
+const ASSETS=['/fund-tracker/','/fund-tracker/index.html','/fund-tracker/manifest.json','/fund-tracker/icon-192.png','/fund-tracker/icon-512.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).catch(()=>{})).then(()=>self.skipWaiting()))});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+self.addEventListener('fetch',e=>{
+  const u=e.request.url;
+  if(u.includes('fundgz')||u.includes('eastmoney')||u.includes('codetabs')||u.includes('allorigins')||u.includes('generativelanguage')||u.includes('dashscope'))return;
+  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(cache=>cache.put(e.request,c));return r}).catch(()=>caches.match(e.request)));
 });
