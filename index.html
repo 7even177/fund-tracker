@@ -1356,34 +1356,38 @@ function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.rem
   }catch(e){}
 })();
 
-// 预置持仓数据 v3（修正基金名称，用实际持仓金额，成本在首次拉净值时自动校正）
+// 预置持仓数据 v4（正确基金代码 + 真实净值 + 精确份额）
 (function(){
-  const PRESET_VER = 'preset_v3';
+  const PRESET_VER = 'preset_v4';
   if(localStorage.getItem(PRESET_VER)) return;
   const today = '2026-05-19';
-  // 正确的基金数据（来自支付宝截图）
+  // 数据来源：天天基金API实时查询 + 支付宝截图持有金额
+  // 份额 = 持有金额 / 最新净值（精确计算）
   const preset = [
-    {code:'270042',name:'南方纳斯达克100指数(QDII)C',              investAmount:498.14},
-    {code:'016816',name:'博时上证科创板人工智能ETF联接C',            investAmount:1174.25},
-    {code:'050025',name:'博时标普500ETF联接(QDII)C',               investAmount:30.03},
-    {code:'400015',name:'泰信发展主题混合',                         investAmount:0.01},
-    {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C',   investAmount:200.00},
-    {code:'016874',name:'鹏华创新未来混合(LOF)C',                   investAmount:4254.73},
-    {code:'010766',name:'广发远见智选混合C',                         investAmount:2444.17},
+    // 代码      基金名                                    持有金额    最新净值（2026-05-18）
+    {code:'016453',name:'南方纳斯达克100指数发起(QDII)C',   investAmount:498.14,  nav:2.2752},
+    {code:'023521',name:'博时上证科创板人工智能ETF发起式联接C',investAmount:1174.25, nav:1.4507},
+    {code:'006075',name:'博时标普500ETF联接C',              investAmount:30.03,   nav:5.4540},
+    {code:'400015',name:'东方新能源汽车混合',               investAmount:0.01,    nav:3.4159},
+    {code:'024418',name:'华夏上证科创板半导体材料设备主题ETF发起式联接C',investAmount:200.00, nav:1.9696},
+    {code:'501205',name:'鹏华创新未来混合(LOF)C',           investAmount:4254.73, nav:1.0152},
+    {code:'016874',name:'广发远见智选混合C',                investAmount:2444.17, nav:2.0274},
   ];
   const d = ld();
+  // 清除旧的错误代码数据
+  const oldCodes=['270042','016816','050025','015311','016874','010766'];
+  d.funds=d.funds.filter(f=>!oldCodes.includes(f.code));
   preset.forEach(p=>{
     const existIdx=d.funds.findIndex(f=>f.code===p.code);
-    // 用临时成本1.0，pollNav 首次拉到真实净值后会自动修正
-    const nav=1.0, shares=p.investAmount/nav;
+    const shares=p.investAmount/p.nav; // 精确份额
     const fundObj={
       code:p.code, name:p.name,
-      shares, cost:nav,
+      shares, cost:p.nav,        // 成本 = 当前净值（以今日持有金额为基准）
       investAmount:p.investAmount,
       addDate:today,
-      trades:[{id:uid(),date:today,type:'buy',shares,price:nav,amount:p.investAmount}],
+      trades:[{id:uid(),date:today,type:'buy',shares,price:p.nav,amount:p.investAmount}],
       relatedSectors:[], holdings:[],
-      nav:null, gsz:null, gztime:null, navDate:null, gszzl:null, historyNav:[]
+      nav:p.nav, gsz:null, gztime:null, navDate:'2026-05-18', gszzl:null, historyNav:[]
     };
     if(existIdx>=0) d.funds[existIdx]=fundObj;
     else d.funds.push(fundObj);
