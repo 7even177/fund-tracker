@@ -1113,79 +1113,70 @@ async function importAllOcr(){
   const statusEl=document.getElementById('ocr-status');
   const importBtn=document.getElementById('ocr-import-all');
   if(importBtn){importBtn.disabled=true;importBtn.textContent='导入中...'}
-  if(statusEl)statusEl.innerHTML='<div>⏳ 正在导入...</div>';
+  if(statusEl){statusEl.style.display='block';statusEl.innerHTML='<div>⏳ 并行获取净值中...</div>'}
 
-  let imported=0,skipped=0;
-  const data=ld();
-
-  for(const fund of ocrResults){
-    if(!fund.name&&!fund.code)continue;
-
+  // 1. 并行获取所有基金的实时净值（不串行等待）
+  const resolved=await Promise.all(ocrResults.map(async(fund)=>{
     let code=fund.code;
     let name=fund.name;
-
-    // If no code, try to find it
-    if(!code&&name){
-      code=await searchFundCode(name);
-    }
-
-    // If still no code, try to fetch from name via fNav
-    if(!code){
-      // Use name as-is, user can edit later
-      code=null;
-    }
-
-    // Check if fund already exists
-    if(code&&data.funds.find(f=>f.code===code)){
-      skipped++;
-      continue;
-    }
-
-    // If we have a code, verify name via fNav
+    let realNav=null;
+    // 没有代码则搜索
+    if(!code&&name) code=await searchFundCode(name)||null;
+    // 有代码则拉实时净值（用于校正成本）
     if(code){
       try{
         const navData=await fNav(code);
         if(navData){
           name=navData.name||name;
+          realNav=parseFloat(navData.dwjz)||null;
         }
       }catch(e){}
     }
+    if(!code) code='tmp_'+Math.random().toString(36).slice(2,8);
+    return{...fund,code,name,realNav};
+  }));
 
-    if(!code){
-      // Generate a temporary code from name hash
-      code='tmp_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+  // 2. 批量写入（同代码/同名则覆盖更新）
+  const data=ld();
+  let imported=0,updated=0;
+  for(const fund of resolved){
+    if(!fund.name&&!fund.code)continue;
+    const amount=fund.amount||0;
+    // 成本净值：优先用实时净值，否则用金额反推
+    const costNav=fund.realNav||(amount>0&&fund.holdReturn?amount/(amount-fund.holdReturn):1)||1;
+    const shares=amount>0?amount/Math.max(costNav,0.0001):0;
+    const today=td();
+
+    // 查找是否已存在（按代码 或 按名称）
+    const existIdx=data.funds.findIndex(f=>f.code===fund.code||(f.name&&fund.name&&f.name===fund.name));
+    const fundObj={
+      code:fund.code, name:fund.name||fund.code,
+      shares, cost:costNav,
+      investAmount:amount,
+      addDate:existIdx>=0?data.funds[existIdx].addDate:today,
+      trades:existIdx>=0?data.funds[existIdx].trades:[{id:uid(),date:today,type:'buy',shares,price:costNav,amount}],
+      relatedSectors:existIdx>=0?data.funds[existIdx].relatedSectors:[],
+      holdings:existIdx>=0?data.funds[existIdx].holdings:[],
+      nav:fund.realNav,gsz:null,gztime:null,navDate:null,gszzl:null,historyNav:[]
+    };
+    if(existIdx>=0){
+      data.funds[existIdx]=fundObj;
+      updated++;
+    }else{
+      data.funds.push(fundObj);
+      imported++;
     }
-
-    const costNav=fund.amount>0&&fund.holdReturn!==undefined?fund.amount/(fund.amount+fund.holdReturn)*1:1;
-    const shares=fund.amount>0?fund.amount/Math.max(costNav,0.0001):0;
-
-    data.funds.push({
-      code,
-      name:name||code,
-      shares:shares,
-      cost:costNav,
-      addDate:td(),
-      investAmount:fund.amount,
-      trades:[{id:uid(),date:td(),type:'buy',shares,price:costNav,amount:fund.amount}],
-      relatedSectors:[],
-      holdings:[],
-      nav:null,gsz:null,gztime:null,navDate:null,gszzl:null,historyNav:[]
-    });
-
-    imported++;
-    if(statusEl)statusEl.innerHTML=`<div>⏳ 已导入 ${imported}/${ocrResults.length}...</div>`;
   }
-
   sv(data);
 
-  if(statusEl)statusEl.innerHTML=`<div style="color:var(--green)">✅ 导入完成！成功 ${imported} 只${skipped>0?'，跳过 '+skipped+' 只已存在的':''}</div>`;
-  if(importBtn){importBtn.textContent='✅ 导入完成';importBtn.style.background='var(--green)'}
+  const msg=`✅ 完成！新增 ${imported} 只${updated>0?'，更新 '+updated+' 只':''}`;
+  if(statusEl)statusEl.innerHTML=`<div style="color:var(--green)">${msg}</div>`;
+  if(importBtn){importBtn.textContent='✅ 已完成';importBtn.style.background='var(--green)'}
 
-  setTimeout(()=>{
-    hModal();
-    renHome();
-    pollNav();
-  },1500);
+  // 立即刷新页面，不等待
+  hModal();
+  renHome();
+  startPoll();
 }
 
 /* ===== OCR Tab Switching & Text Paste Parsing ===== */
