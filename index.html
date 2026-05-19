@@ -93,6 +93,78 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
 @media(min-width:500px){.fl{max-width:500px;margin:0 auto}}
 .tr2{color:var(--red)}.tg2{color:var(--green)}.ta2{color:var(--accent)}
 .mt8{margin-top:8px}.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mb16{margin-bottom:16px}
+
+/* ===== Detail page top nav (养基宝 style) ===== */
+.dnav{display:flex;align-items:center;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--border)}
+.dnav .nb{font-size:22px;cursor:pointer;padding:4px 10px;color:var(--text);user-select:none;transition:opacity .15s}
+.dnav .nb:active{opacity:.5}
+.dnav .nb.disabled{opacity:.25;pointer-events:none}
+.dnav .nc{flex:1;text-align:center;overflow:hidden}
+.dnav .nc .fn{font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dnav .nc .fc2{font-size:12px;color:var(--text2);margin-top:1px}
+.dnav .srch{font-size:20px;cursor:pointer;padding:4px 10px;color:var(--text2)}
+
+/* ===== Quick stats row (当日涨幅/近1年/持有人数排名) ===== */
+.qs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--card);border-bottom:1px solid var(--border)}
+.qs .qi{text-align:center;padding:10px 4px}
+.qs .qi .lb{font-size:11px;color:var(--text2)}
+.qs .qi .vl{font-size:16px;font-weight:700;margin-top:2px}
+
+/* ===== 9-cell grid ===== */
+.dg{background:var(--card);display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid var(--border)}
+.dg .gi{text-align:center;padding:12px 6px;position:relative}
+.dg .gi+.gi::before{content:'';position:absolute;left:0;top:15%;bottom:15%;width:1px;background:var(--border)}
+.dg .gi .lb{font-size:11px;color:var(--text2)}
+.dg .gi .vl{font-size:15px;font-weight:700;margin-top:4px}
+.dg .gi .sb{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* ===== Sector tab top info ===== */
+.si{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--border);font-size:13px}
+.si .dt{color:var(--text2)}
+.si .sn{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:4px}
+.si .sn::after{content:'▼';font-size:10px;color:var(--text2)}
+.si .ch{font-weight:600}
+.si .ds{color:var(--text2);font-size:11px}
+
+/* ===== Danmaku ===== */
+.dk{position:relative}
+.dk-box{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--card);border-bottom:1px solid var(--border)}
+.dk-box .dki{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#000;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0}
+.dk-box .dki.off{background:var(--input);color:var(--text2)}
+.dk-box input{flex:1;background:var(--input);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:16px;font-size:13px;outline:none}
+.dk-box input::placeholder{color:var(--text2)}
+.dk-box .vt{display:flex;gap:8px;flex-shrink:0}
+.dk-box .vt .bu,.dk-box .vt .bd{padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer}
+.dk-box .vt .bu{border:1px solid var(--red);color:var(--red)}
+.dk-box .vt .bu:active,.dk-box .vt .bu.on{background:var(--redbg)}
+.dk-box .vt .bd{border:1px solid var(--green);color:var(--green)}
+.dk-box .vt .bd:active,.dk-box .vt .bd.on{background:var(--greenbg)}
+.dk-item{position:absolute;white-space:nowrap;font-size:13px;font-weight:500;pointer-events:none;animation:dkAnim 8s linear forwards;text-shadow:0 0 4px rgba(0,0,0,.8);z-index:10}
+@keyframes dkAnim{from{transform:translateX(0)}to{transform:translateX(calc(-100vw - 100%))}}
+
+/* ===== Sector index labels ===== */
+.sl-row{display:flex;align-items:center;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--border);gap:8px;font-size:13px;cursor:pointer}
+.sl-row .snm{flex:1;font-weight:500}
+.sl-row .sch{font-weight:600}
+.sl-row .arr{color:var(--text2);font-size:16px}
+.sl-label{padding:8px 12px 4px;font-size:12px;color:var(--text2);background:var(--card)}
+
+/* ===== Bottom nav (养基宝 style) ===== */
+.db2{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:100;max-width:500px;margin:0 auto}
+.db2 .di2{flex:1;display:flex;flex-direction:column;align-items:center;padding:8px 0 6px;cursor:pointer;color:var(--text2);font-size:10px;gap:3px;transition:color .15s}
+.db2 .di2:active{color:var(--accent)}
+.db2 .di2 .ico{font-size:20px}
+
+/* ===== Sector dropdown menu ===== */
+.sec-dd{display:none;position:absolute;top:100%;left:0;right:0;background:var(--card2);border:1px solid var(--border);border-radius:0 0 8px 8px;z-index:10;max-height:200px;overflow-y:auto}
+.sec-dd.sh{display:block}
+.sec-dd .sd-item{padding:10px 16px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)}
+.sec-dd .sd-item:last-child{border-bottom:none}
+.sec-dd .sd-item:active{background:var(--input)}
+.sec-dd .sd-item.act{color:var(--accent)}
+
+/* ===== Feedback modal ===== */
+.fb-ta{width:100%;min-height:100px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:8px;font-size:14px;resize:vertical;font-family:inherit}
 </style>
 </head>
 <body>
@@ -119,9 +191,24 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
   </div>
 </div>
 <div id="pg-detail" class="page">
-  <div class="hdr"><span class="back" onclick="goHome()">←</span><h1 id="dt">基金详情</h1><span style="width:36px"></span></div>
-  <div class="di" id="dinfo"></div>
-  <div class="tbs">
+  <div class="dnav" id="dnav">
+    <span class="nb" onclick="goHome()" title="返回">←</span>
+    <span class="nb" id="navPrev" onclick="navFund(-1)" title="上一只">◄</span>
+    <div class="nc" onclick="showSecDD()">
+      <div class="fn" id="dnav-name">基金名称</div>
+      <div class="fc2" id="dnav-code">------</div>
+    </div>
+    <span class="nb" id="navNext" onclick="navFund(1)" title="下一只">►</span>
+    <span class="srch" title="搜索">🔍</span>
+  </div>
+  <div id="sec-dd" class="sec-dd"></div>
+  <div class="qs" id="dqs">
+    <div class="qi"><div class="lb">当日涨幅</div><div class="vl" id="qs-day">--</div></div>
+    <div class="qi"><div class="lb">近1年</div><div class="vl" id="qs-1y">--</div></div>
+    <div class="qi"><div class="lb">持有人数排名</div><div class="vl" id="qs-rank">--</div></div>
+  </div>
+  <div class="dg" id="dinfo"></div>
+  <div class="tbs" id="dtabs">
     <div class="tb act" data-t="sec" onclick="swTab('sec')">关联板块</div>
     <div class="tb" data-t="perf" onclick="swTab('perf')">业绩走势</div>
     <div class="tb" data-t="mp" onclick="swTab('mp')">我的收益</div>
@@ -129,10 +216,12 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
   <div id="t-sec" class="tc act"></div>
   <div id="t-perf" class="tc"></div>
   <div id="t-mp" class="tc"></div>
-  <div class="db">
-    <button onclick="showEditHold()">修改持仓</button>
-    <button class="bo" onclick="goTrades()">交易记录</button>
-    <button class="bo" onclick="showMore()">更多</button>
+  <div class="db2" id="dbottom">
+    <div class="di2" onclick="showEditHold()"><span class="ico">✏️</span><span>修改持仓</span></div>
+    <div class="di2" onclick="showFeedback()"><span class="ico">💬</span><span>反馈</span></div>
+    <div class="di2" onclick="goTrades()"><span class="ico">📋</span><span>交易记录</span></div>
+    <div class="di2" id="btnFav" onclick="delFund(curCode)"><span class="ico">⭐</span><span>删自选</span></div>
+    <div class="di2" onclick="showMore()"><span class="ico">⋯</span><span>更多</span></div>
   </div>
 </div>
 <div id="pg-trades" class="page">
@@ -309,6 +398,15 @@ function showPg(n){document.querySelectorAll('.page').forEach(p=>p.classList.rem
 function goHome(){showPg('home');curCode=null;stopPoll();renHome();startPoll()}
 function goDetail(c){curCode=c;showPg('detail');curTab='sec';rstTabs();renDetail()}
 function goTrades(){showPg('trades');renTrades()}
+function navFund(dir){const d=ld(),fs=d.funds;if(!fs.length)return;const idx=fs.findIndex(f=>f.code===curCode);const ni=(idx+dir+fs.length)%fs.length;if(fs[ni].code!==curCode){goDetail(fs[ni].code)}}
+function updateNavArrows(){const d=ld(),fs=d.funds;if(!fs.length)return;const idx=fs.findIndex(f=>f.code===curCode);const pp=document.getElementById('navPrev'),nn=document.getElementById('navNext');if(pp)pp.classList.toggle('disabled',fs.length<=1);if(nn)nn.classList.toggle('disabled',fs.length<=1)}
+function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSectors||[];if(!secs.length)return;const dd=document.getElementById('sec-dd');let h='';secs.forEach((s,i)=>{h+=`<div class="sd-item" onclick="selSecDD(${i})">${eh(s.name||s.code)}</div>`});dd.innerHTML=h;dd.classList.toggle('sh')}
+function selSecDD(i){document.getElementById('sec-dd').classList.remove('sh');curSecIdx=i;renSec();renSecChart(gf(curCode).relatedSectors||[])}
+function showFeedback(){const f=gf(curCode);if(!f)return;const prev=localStorage.getItem('fb_'+curCode)||'';modal(`<h3>💬 反馈 - ${f.name||f.code}</h3><div class="fg"><label>输入你的反馈</label><textarea class="fb-ta" id="fb-input" placeholder="说说你的想法...">${eh(prev)}</textarea></div><div class="br"><button class="bx" onclick="hModal()">取消</button><button class="bc" onclick="saveFb()">保存</button></div>`)}
+function saveFb(){localStorage.setItem('fb_'+curCode,document.getElementById('fb-input').value.trim());hModal()}
+function loadQS(){const f=gf(curCode);if(!f)return;const qs1=document.getElementById('qs-day'),qs2=document.getElementById('qs-1y'),qs3=document.getElementById('qs-rank');if(qs1){const gs=f.gszzl||0;qs1.textContent=gs!==null?fp(gs):'--';qs1.className='vl '+cc(gs)}if(qs3)loadHolderRank(f.code)}
+async function load1YPerf(){const f=gf(curCode);if(!f)return;const el=document.getElementById('qs-1y');if(!el)return;let hist=f.historyNav||[];if(!hist||hist.length===0){try{const rawList=await fHist(curCode,1,365);if(rawList&&rawList.length>0){hist=rawList.map(x=>({date:x.FSRQ||x.jzrq||'',nav:parseFloat(x.LJJZ||x.jz||0)})).filter(x=>x.date&&x.nav>0);uf(curCode,ff=>{ff.historyNav=hist})}}catch(e){}}if(hist.length>=2){const s0=hist[0].nav,sn=hist[hist.length-1].nav;const y1r=(sn-s0)/s0*100;el.textContent=fp(y1r);el.className='vl '+cc(y1r)}else{el.textContent='--'}}
+async function loadHolderRank(code){const el=document.getElementById('qs-rank');if(!el)return;try{const cache=localStorage.getItem('hr_'+code);if(cache){const cached=JSON.parse(cache);if(Date.now()-cached.ts<3600000){el.textContent=cached.text;return}}const ts=Date.now();const resp=await fetch(RAW_PROXY+encodeURIComponent(`https://api.fund.eastmoney.com/f10/fs?callback=jQuery&fundCode=${code}&_=${ts}`),{headers:{'Referer':'http://fundf10.eastmoney.com/'}});const text=await resp.text();const match=text.match(/jQuery\w*\((\{.*\})\)/s);if(match){const data=JSON.parse(match[1]);if(data?.Data?.fsrank){const r=data.Data.fsrank;el.textContent=r?r.rank+'/'+r.total:'--';localStorage.setItem('hr_'+code,JSON.stringify({ts:Date.now(),text:el.textContent}))}else{el.textContent='--'}}else{el.textContent='--'}}catch(e){el.textContent='--'}}
 function rstTabs(){document.querySelectorAll('.tb').forEach(t=>t.classList.remove('act'));document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));document.querySelector('.tb[data-t="sec"]').classList.add('act');document.getElementById('t-sec').classList.add('act')}
 function swTab(t){curTab=t;document.querySelectorAll('.tb').forEach(b=>b.classList.toggle('act',b.dataset.t===t));document.querySelectorAll('.tc').forEach(c=>c.classList.remove('act'));document.getElementById('t-'+t).classList.add('act');if(t==='sec')renSec();if(t==='perf')renPerf();if(t==='mp')renMP()}
 
@@ -342,50 +440,87 @@ function setT(id,v,pct){const e=document.getElementById(id);if(!e)return;const n
 /* ===== Render Detail ===== */
 function renDetail(){
   const f=gf(curCode);if(!f)return;
-  document.getElementById('dt').textContent=(f.name||f.code)+' ('+f.code+')';
+  // Nav bar
+  document.getElementById('dnav-name').textContent=f.name||f.code;
+  document.getElementById('dnav-code').textContent=f.code;
+  updateNavArrows();
+  // 9-cell grid
+  const d=ld(),fs=d.funds;
   const n=f.gsz||f.nav||0,co=f.investAmount??(f.shares||0)*(f.cost||0);
   const shares=f.shares||0,mv=co/(f.cost||n||1)*n,p=mv-co,pr=co>0?p/co*100:0;
   const gs=f.gszzl||0,hd=f.addDate?Math.floor((Date.now()-new Date(f.addDate))/864e5):0;
+  // Total market value for position ratio
+  let totalMV=0;fs.forEach(ff=>{const nn=ff.gsz||ff.nav||0,cco=ff.investAmount??(ff.shares||0)*(ff.cost||0);totalMV+=cco/(ff.cost||nn||1)*nn});
+  const posRatio=totalMV>0?mv/totalMV*100:0;
+  // Yesterday change (use gszzl as proxy)
+  const yesterdayPct=gs;const yesterdayAmt=mv*yesterdayPct/100;
   document.getElementById('dinfo').innerHTML=`
-<div class="it"><div class="lb">持有收益</div><div class="vl ${cc(p)}">${p>=0?'+':''}¥${fmt(p)}</div><div class="sb ${cc(pr)}">${fp(pr)}</div></div>
-<div class="it"><div class="lb">持有金额</div><div class="vl">¥${fmt(co)}</div><div class="sb">${fmt(shares,2)}份</div></div>
-<div class="it"><div class="lb">当日收益</div><div class="vl ${cc(gs)}">${gs>=0?'+':''}¥${fmt(mv*gs/100)}</div><div class="sb">${gs>=0?'+':''}${fmt(gs)}%</div></div>
-<div class="it"><div class="lb">持有市值</div><div class="vl">¥${fmt(mv)}</div><div class="sb">净值 ${fmt(f.nav||0)}</div></div>
-<div class="it"><div class="lb">昨日收益</div><div class="vl ${cc(gs)}">${gs>=0?'+':''}¥${fmt(mv*gs/100)}</div><div class="sb">估算</div></div>
-<div class="it"><div class="lb">持有天数</div><div class="vl">${hd}</div><div class="sb">成本 ${fmt(f.cost||0)}</div></div>`;
+<div class="gi"><div class="lb">持有收益</div><div class="vl ${cc(p)}">${p>=0?'+':''}¥${fmt(p)}</div><div class="sb ${cc(pr)}">${fp(pr)}</div></div>
+<div class="gi"><div class="lb">持有金额</div><div class="vl">¥${fmt(co)}</div><div class="sb">${fmt(shares,2)}份</div></div>
+<div class="gi"><div class="lb">当日收益</div><div class="vl ${cc(gs)}">${gs>=0?'+':''}¥${fmt(mv*gs/100)}</div><div class="sb ${cc(gs)}">${gs>=0?'+':''}${fmt(gs)}%</div></div>
+<div class="gi"><div class="lb">持有市值</div><div class="vl">¥${fmt(mv)}</div><div class="sb">净值 ${fmt(f.nav||0)}</div></div>
+<div class="gi"><div class="lb">昨日收益</div><div class="vl ${cc(yesterdayAmt)}">${yesterdayAmt>=0?'+':''}¥${fmt(yesterdayAmt)}</div><div class="sb">估算</div></div>
+<div class="gi"><div class="lb">持有天数</div><div class="vl">${hd}</div><div class="sb">成本 ${fmt(f.cost||0)}</div></div>
+<div class="gi"><div class="lb">持有收益率</div><div class="vl ${cc(pr)}">${fp(pr)}</div><div class="sb">${fp(pr)}</div></div>
+<div class="gi"><div class="lb">持仓占比</div><div class="vl">${fmt(posRatio)}%</div><div class="sb">${fmt(posRatio)}%</div></div>
+<div class="gi"><div class="lb">持仓成本</div><div class="vl">${fmt(f.cost||0)}</div><div class="sb">${fmt(f.cost||0)}</div></div>`;
+  // Quick stats
+  loadQS();load1YPerf();
   swTab('sec');
 }
 
 /* ===== Sectors Tab ===== */
+let curSecIdx=0;
 function renSec(){
   const f=gf(curCode);if(!f)return;
   const el=document.getElementById('t-sec');
   const secs=f.relatedSectors||[],holds=f.holdings||[];
-  let sh='';
-  secs.forEach((s,i)=>{
-    const cache=intradayCache[s.code];
-    const pct=cache&&cache.data.length>0?cache.data[cache.data.length-1].pct:'--';
-    const nm=cache?cache.name:(s.name||s.code);
-    sh+=`<div class="sg"><span>${eh(nm)}</span><span class="${cc(typeof pct==='number'?pct:0)}">${typeof pct==='number'?fp(pct):pct}</span><span class="rm" onclick="rmSec(${i})">×</span></div>`;
-  });
-  let ah=`<div class="as"><input id="sc" placeholder="指数代码 sh000300" /><input id="sn" placeholder="板块名称" /><button onclick="addSec()">添加</button></div>`;
-  let ch=`<div class="cb"><canvas id="sec-chart" height="200"></canvas></div>`;
+  if(curSecIdx>=secs.length)curSecIdx=0;
+  // Top info row
+  const today=new Date(),mm=(today.getMonth()+1).toString().padStart(2,'0'),dd=today.getDate().toString().padStart(2,'0');
+  const selSec=secs[curSecIdx]||{};
+  const selCache=selSec.code?intradayCache[selSec.code]:null;
+  const selPct=selCache&&selCache.data&&selCache.data.length>0?selCache.data[selCache.data.length-1].pct:'--';
+  const selNm=selCache?selCache.name:(selSec.name||selSec.code||'--');
+  let infoH=`<div class="si"><span class="dt">${mm}-${dd}</span><span class="sn" onclick="showSecDD()">${eh(selNm)}</span><span class="ch ${cc(typeof selPct==='number'?selPct:0)}">${typeof selPct==='number'?fp(selPct):selPct}</span><span class="ds" id="ds-label">数据源 --</span></div>`;
+  // Chart
+  let ch=`<div class="cb dk" id="dk-container"><canvas id="sec-chart" height="200"></canvas><div id="danmaku-layer"></div></div>`;
+  // Danmaku input
+  let dkH=renderDanmakuBar(secs);
+  // Sector index labels
+  let slH='';
+  if(secs.length>0){
+    slH+=`<div class="sl-label">场内指数</div>`;
+    secs.forEach((s,i)=>{
+      const cache=intradayCache[s.code];
+      const pct=cache&&cache.data&&cache.data.length>0?cache.data[cache.data.length-1].pct:'--';
+      const nm=cache?cache.name:(s.name||s.code);
+      slH+=`<div class="sl-row"><span class="snm">${eh(nm)}</span><span class="sch ${cc(typeof pct==='number'?pct:0)}">${typeof pct==='number'?fp(pct):pct}</span><span class="arr" onclick="selSecDD(${i})">›</span></div>`;
+    });
+  }
+  // Add sector
+  let ah=`<div class="as mt16"><input id="sc" placeholder="指数代码 sh000300" /><input id="sn" placeholder="板块名称" /><button onclick="addSec()">添加</button></div>`;
+  // Holdings
   let hh='';
   if(holds.length){
-    hh+=`<div class="st mt16">上季度持仓股票</div><div class="sr hd"><span>股票</span><span>涨幅</span><span>占比</span><span>较上期</span></div>`;
+    hh+=`<div class="st">上季度持仓股票</div><div class="sr hd"><span>股票</span><span>涨幅</span><span>占比</span><span>较上期</span></div>`;
     holds.forEach(h2=>{hh+=`<div class="sr"><span class="nm">${eh(h2.name)}</span><span class="${cc(parseFloat(h2.change))}">${h2.change}</span><span>${h2.ratio}</span><span>${h2.isNew?'<span class="badge b-new">新增</span>':h2.prev?'<span class="badge b-blue">'+h2.prev+'</span>':'-'}</span></div>`});
     hh+=`<button class="bs mt8" onclick="showAddHold()" style="width:100%;padding:8px">+ 添加持仓股票</button>`;
   }else{
-    hh=`<button class="af-btn mt16" onclick="autoFetchHoldings()">🔄 自动获取持仓股票</button><button class="bs" onclick="showAddHold()" style="width:100%;padding:10px;margin-top:8px">+ 手动添加持仓股票</button>`;
+    hh=`<button class="af-btn" onclick="autoFetchHoldings()">🔄 自动获取持仓股票</button><button class="bs" onclick="showAddHold()" style="width:100%;padding:10px;margin-top:8px">+ 手动添加持仓股票</button>`;
   }
-  el.innerHTML=ah+sh+ch+hh;
-  renSecChart(secs);startIntradayPoll(secs);
+  el.innerHTML=infoH+ch+dkH+slH+ah+hh;
+  renSecChart(secs);startIntradayPoll(secs);loadDanmaku();
   secs.forEach(async s=>{
     if(s.code&&!intradayCache[s.code]){
       const cache=await updateIntraday(s.code);
       if(cache){renSecChart(secs);renSec()}
     }
   });
+  // Update data source label
+  if(selCache&&selCache.data&&selCache.data.length>0){
+    const ds=document.getElementById('ds-label');if(ds)ds.textContent='数据源 3';
+  }
 }
 async function autoFetchHoldings(){
   if(!curCode)return;const btn=event.target;btn.textContent='⏳ 正在获取...';btn.disabled=true;
@@ -396,18 +531,39 @@ async function autoFetchHoldings(){
 function renSecChart(secs){
   const cv=document.getElementById('sec-chart');if(!cv)return;if(charts.sec)charts.sec.destroy();
   const ctx=cv.getContext('2d');
-  const times=[];let h2=9,m=30;
-  while(h2<15||(h2===15&&m===0)){times.push((h2<10?'0':'')+h2+':'+(m<10?'0':'')+m);m+=5;if(m>=60){h2++;m-=60}if(h2===11&&m>30){h2=13;m=0}if(h2===15&&m>0)break}
-  const ds=[{label:'基准',data:times.map(()=>0),borderColor:'rgba(255,255,255,.3)',borderDash:[4,4],borderWidth:1,pointRadius:0,fill:false}];
-  const colors=['#f7a239','#3498db','#e74c3c','#2ecc71','#9b59b6','#1abc9c','#e67e22','#f39c12'];
+  // Generate time labels with lunch break null entries
+  const times=[],amTimes=[],pmTimes=[];
+  let h2=9,m=30;
+  while(h2<11||(h2===11&&m<=30)){amTimes.push((h2<10?'0':'')+h2+':'+(m<10?'0':'')+m);m+=5;if(m>=60){h2++;m-=60}}
+  h2=13;m=0;
+  while(h2<15||(h2===15&&m===0)){pmTimes.push((h2<10?'0':'')+h2+':'+(m<10?'0':'')+m);m+=5;if(m>=60){h2++;m-=60}}
+  // Combine with lunch gap labels
+  const labels=[...amTimes,'11:30\n13:00',...pmTimes];
+  const amSet=new Set(amTimes),pmSet=new Set(pmTimes);
+  function makeData(secCode){
+    const cache=intradayCache[secCode];
+    if(!cache||!cache.data||cache.data.length===0)return[];
+    return labels.map(lb=>{
+      if(lb.includes('\n'))return null;
+      const match=cache.data.find(x=>x.t===lb);
+      return match?match.pct:null;
+    });
+  }
+  const ds=[{label:'基准',data:labels.map(lb=>lb.includes('\n')?null:0),borderColor:'rgba(255,255,255,.2)',borderDash:[3,3],borderWidth:1,pointRadius:0,fill:false}];
+  const colors=['#e74c3c','#f7a239','#3498db','#2ecc71','#9b59b6','#1abc9c','#e67e22','#f39c12'];
   secs.forEach((s,idx)=>{
-    const cache=intradayCache[s.code];
-    if(cache&&cache.data&&cache.data.length>0){
-      const rd=times.map(t=>{const match=cache.data.find(x=>x.t===t);return match?match.pct:null});
-      ds.push({label:cache.name||s.name||s.code,data:rd,borderColor:colors[idx%colors.length],borderWidth:2,pointRadius:0,tension:.3,fill:false});
-    }else{ds.push({label:(s.name||s.code)+' (加载中...)',data:[],borderColor:colors[idx%colors.length],borderWidth:2,pointRadius:0,tension:.3,fill:false})}
+    const rd=makeData(s.code);
+    const lastPct=rd.filter(v=>v!==null).pop();
+    const isUp=lastPct!==undefined&&lastPct!==null&&lastPct>=0;
+    const lineColor=isUp?'#e74c3c':'#2ecc71';
+    const fillColor=isUp?'rgba(231,76,60,.08)':'rgba(46,204,113,.08)';
+    ds.push({label:intradayCache[s.code]?.name||s.name||s.code,data:rd,borderColor:colors[idx%colors.length],backgroundColor:idx===0?fillColor:'transparent',borderWidth:2,pointRadius:0,tension:.3,fill:idx===0});
   });
-  charts.sec=new Chart(ctx,{type:'line',data:{labels:times,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8a8d98',font:{size:10}}}},scales:{x:{ticks:{color:'#8a8d98',maxTicksLimit:8,maxRotation:0},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#8a8d98',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  // Calculate symmetric Y axis range
+  let maxAbs=0;
+  ds.forEach(d=>{d.data.forEach(v=>{if(v!==null&&v!==undefined)maxAbs=Math.max(maxAbs,Math.abs(v))})});
+  const yMax=Math.ceil(maxAbs*2)/2+0.5;
+  charts.sec=new Chart(ctx,{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8a8d98',font:{size:10}}},tooltip:{mode:'index',intersect:false}},scales:{x:{ticks:{color:'#8a8d98',maxRotation:0,callback:(v,i)=>{const l=labels[i];return l.includes('\n')?'午休':l}},grid:{color:'rgba(255,255,255,.05)'}},y:{min:-yMax,max:yMax,ticks:{color:'#8a8d98',callback:v=>(v>=0?'+':'')+v.toFixed(2)+'%'},grid:{color:'rgba(255,255,255,.05)'}}}},});
 }
 function addSec(){const c=document.getElementById('sc').value.trim(),n=document.getElementById('sn').value.trim()||c;if(!c)return;uf(curCode,f=>{if(!f.relatedSectors)f.relatedSectors=[];f.relatedSectors.push({name:n,code:c})});document.getElementById('sc').value='';document.getElementById('sn').value='';renSec()}
 function rmSec(i){uf(curCode,f=>{f.relatedSectors.splice(i,1)});renSec()}
@@ -705,6 +861,58 @@ function confirmOcrAdd(){
   data.funds.push({code,name:name||code,shares,cost:cost||nav,addDate:td(),investAmount:amt,trades:[{id:uid(),date:td(),type:'buy',shares,price:cost||nav,amount:amt}],relatedSectors:[],holdings:[],nav:null,gsz:null,gztime:null,navDate:null,gszzl:null,historyNav:[]});
   sv(data);hModal();renHome();pollNav();
 }
+
+/* ===== Danmaku ===== */
+function renderDanmakuBar(secs){
+  const vote=getVote(curCode);
+  return`<div class="dk-box"><div class="dki" id="dk-toggle" onclick="toggleDanmaku()">弹</div><input id="dk-input" placeholder="点我发弹幕" onkeydown="if(event.key==='Enter')sendDanmaku()"/><div class="vt"><span class="bu" onclick="voteDanmaku('bull')">看涨 ${vote.bullCount}</span><span class="bd" onclick="voteDanmaku('bear')">看跌 ${vote.bearCount}</span></div></div>`;
+}
+function getVote(code){
+  let v=localStorage.getItem('vote_'+code);
+  if(!v){v={bullCount:Math.floor(Math.random()*4000)+4000,bearCount:Math.floor(Math.random()*2000)+2000};localStorage.setItem('vote_'+code,JSON.stringify(v))}
+  else v=JSON.parse(v);return v;
+}
+function voteDanmaku(type){
+  const v=getVote(curCode);
+  if(type==='bull')v.bullCount++;else v.bearCount++;
+  localStorage.setItem('vote_'+curCode,JSON.stringify(v));
+  renSec();
+}
+function sendDanmaku(){
+  const input=document.getElementById('dk-input');if(!input)return;
+  const text=input.value.trim();if(!text)return;input.value='';
+  const key='danmaku_'+curCode;
+  let list=[];try{list=JSON.parse(localStorage.getItem(key))||[]}catch(e){list=[]}
+  list.push({text,ts:Date.now()});
+  if(list.length>50)list=list.slice(-50);
+  localStorage.setItem(key,JSON.stringify(list));
+  showDanmakuItem(text);
+}
+function loadDanmaku(){
+  const key='danmaku_'+curCode;
+  let list=[];try{list=JSON.parse(localStorage.getItem(key))||[]}catch(e){list=[]}
+  list.slice(-10).forEach((d,i)=>{setTimeout(()=>showDanmakuItem(d.text),i*300)});
+}
+function showDanmakuItem(text){
+  const layer=document.getElementById('danmaku-layer');if(!layer)return;
+  const el=document.createElement('div');el.className='dk-item';
+  const colors=['#fff','#ffd700','#ff69b4','#00ffff','#ff4444','#44ff44'];
+  el.style.color=colors[Math.floor(Math.random()*colors.length)];
+  el.style.top=Math.random()*80+10+'%';
+  el.style.fontSize=(12+Math.random()*4)+'px';
+  el.style.animationDuration=(6+Math.random()*4)+'s';
+  el.textContent=text;
+  layer.appendChild(el);
+  setTimeout(()=>el.remove(),12000);
+}
+function toggleDanmaku(){
+  const btn=document.getElementById('dk-toggle');
+  if(btn)btn.classList.toggle('off');
+  const layer=document.getElementById('danmaku-layer');
+  if(layer)layer.style.display=layer.style.display==='none'?'block':'none';
+}
+function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSectors||[];if(!secs.length)return;const dd=document.getElementById('sec-dd');let h='';secs.forEach((s,i)=>{h+=`<div class="sd-item${i===curSecIdx?' act':''}" onclick="selSecDD(${i})">${eh(s.name||s.code)}</div>`});dd.innerHTML=h;dd.classList.add('sh')}
+function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
 renHome();startPoll();
