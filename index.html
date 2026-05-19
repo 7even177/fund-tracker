@@ -398,10 +398,41 @@ async function fetchFundHoldings(code){
 /* ===== Polling ===== */
 async function pollNav(){
   const d=ld();
-  for(const f of d.funds){try{const r=await fNav(f.code);if(r){f.name=r.name||f.name;f.nav=parseFloat(r.dwjz)||f.nav;f.gsz=parseFloat(r.gsz)||null;f.gztime=r.gztime||null;f.navDate=r.jzrq||null;f.gszzl=r.gszzl!==undefined?parseFloat(r.gszzl):null}}catch(e){}}
-  sv(d);if(curPg==='home')renHome();if(curPg==='detail'&&curCode)renDetail();
+  // 并行拉取所有基金净值
+  await Promise.all(d.funds.map(async f=>{
+    try{
+      const r=await fNav(f.code);
+      if(r){
+        f.name=r.name||f.name;
+        f.nav=parseFloat(r.dwjz)||f.nav;
+        f.gsz=parseFloat(r.gsz)||null;
+        f.gztime=r.gztime||null;
+        f.navDate=r.jzrq||null;
+        f.gszzl=r.gszzl!==undefined?parseFloat(r.gszzl):null;
+        // 修正成本：如果成本是1.0但实际净值差异很大，用实际净值重置成本（只在首次拉到数据时）
+        if(f.cost===1&&f.nav&&Math.abs(f.nav-1)>0.1){
+          // 用投入金额和实际净值反推份额
+          if(f.investAmount>0){
+            f.shares=f.investAmount/f.nav;
+            f.cost=f.nav;
+          }
+        }
+      }
+    }catch(e){}
+  }));
+  sv(d);
+  // 立即更新UI
+  if(curPg==='home')renHome();
+  if(curPg==='detail'&&curCode)renDetail();
 }
-function startPoll(){if(navTimer)clearInterval(navTimer);pollNav();navTimer=setInterval(()=>{const h=new Date().getHours();if(h>=9&&h<15)pollNav()},30000)}
+function startPoll(){
+  if(navTimer)clearInterval(navTimer);
+  pollNav(); // 立即执行一次
+  navTimer=setInterval(()=>{
+    const h=new Date().getHours();
+    if(h>=9&&h<16)pollNav(); // 交易时段每15秒更新
+  },15000);
+}
 function stopPoll(){if(navTimer){clearInterval(navTimer);navTimer=null}if(intradayTimer){clearInterval(intradayTimer);intradayTimer=null}}
 
 /* ===== Navigation ===== */
@@ -967,12 +998,18 @@ async function startAiRecognition(){
   const base64Data=ocrImageData.split(',')[1];
   const mimeType=ocrImageData.split(',')[0].match(/data:(.*?);/)?.[1]||'image/jpeg';
 
-  const prompt=`请仔细识别这张支付宝基金持仓截图，提取所有基金的完整信息。
-要求：
-1. name必须是基金完整全称，不能截断（如"南方纳斯达克100指数(QDII)C"）
-2. 如果能看到基金代码（6位数字），填入code字段
-返回纯JSON数组，格式：[{"name":"基金完整全称","code":"代码或空","amount":持有金额数字,"dayReturn":日收益数字,"holdReturn":持有收益数字}]
-只返回JSON数组，不要任何其他文字。`;
+  const prompt=`你是专业的基金数据提取助手。请逐行仔细阅读这张支付宝基金持仓截图，提取每一只基金的数据。
+
+重要规则：
+1. 每只基金的名称必须完整、精确，不能截断也不能与其他基金混淆。常见基金名如"南方纳斯达克100指数(QDII)C"、"博时上证科创板人工智能ETF联接C"、"博时标普500ETF联接(QDII)C"等，注意区分不同基金。
+2. amount是"持有金额"字段（如¥498.14），不是收益
+3. dayReturn是"当日收益"（今日盈亏，可能是负数）
+4. holdReturn是"持有收益"（总累计盈亏，可能是负数）
+5. 如果截图中有6位基金代码数字，填入code字段
+
+只返回JSON数组，格式：[{"name":"基金完整精确全名","code":"6位代码或空字符串","amount":持有金额数字,"dayReturn":当日收益数字,"holdReturn":持有收益数字}]
+
+不要输出任何解释、markdown、代码块，只输出纯JSON数组。`;
 
   // 优先用用户自己配置的接口，否则用阿里云/ Gemini 免费接口
   const cfg=getAiConfig();
@@ -1312,35 +1349,37 @@ function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.rem
   }catch(e){}
 })();
 
-// 预置持仓数据（强制写入，标记版本避免重复）
+// 预置持仓数据 v3（修正基金名称，用实际持仓金额，成本在首次拉净值时自动校正）
 (function(){
-  const PRESET_VER = 'preset_v2';
-  if(localStorage.getItem(PRESET_VER)) return; // 已写入过则跳过
+  const PRESET_VER = 'preset_v3';
+  if(localStorage.getItem(PRESET_VER)) return;
   const today = '2026-05-19';
+  // 正确的基金数据（来自支付宝截图）
   const preset = [
-    {code:'270042',name:'南方纳斯达克100指数(QDII)C',    investAmount:498.14},
-    {code:'016816',name:'博时上证科创板人工智能ETF联接C',  investAmount:1174.25},
-    {code:'050025',name:'博时标普500ETF联接(QDII)C',     investAmount:30.03},
-    {code:'400015',name:'泰信发展主题混合',               investAmount:0.01},
-    {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C', investAmount:200.00},
-    {code:'016874',name:'鹏华创新未来混合(LOF)C',         investAmount:4254.73},
-    {code:'010766',name:'广发远见智选混合C',               investAmount:100.00},
+    {code:'270042',name:'南方纳斯达克100指数(QDII)C',              investAmount:498.14},
+    {code:'016816',name:'博时上证科创板人工智能ETF联接C',            investAmount:1174.25},
+    {code:'050025',name:'博时标普500ETF联接(QDII)C',               investAmount:30.03},
+    {code:'400015',name:'泰信发展主题混合',                         investAmount:0.01},
+    {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C',   investAmount:200.00},
+    {code:'016874',name:'鹏华创新未来混合(LOF)C',                   investAmount:4254.73},
+    {code:'010766',name:'广发远见智选混合C',                         investAmount:2444.17},
   ];
   const d = ld();
-  const existCodes = d.funds.map(f=>f.code);
   preset.forEach(p=>{
-    if(existCodes.includes(p.code)) return; // 已存在则跳过
-    const nav = 1.0;
-    const shares = p.investAmount / nav;
-    d.funds.push({
+    const existIdx=d.funds.findIndex(f=>f.code===p.code);
+    // 用临时成本1.0，pollNav 首次拉到真实净值后会自动修正
+    const nav=1.0, shares=p.investAmount/nav;
+    const fundObj={
       code:p.code, name:p.name,
-      shares:shares, cost:nav,
+      shares, cost:nav,
       investAmount:p.investAmount,
       addDate:today,
-      trades:[{id:uid(),date:today,type:'buy',shares:shares,price:nav,amount:p.investAmount}],
+      trades:[{id:uid(),date:today,type:'buy',shares,price:nav,amount:p.investAmount}],
       relatedSectors:[], holdings:[],
       nav:null, gsz:null, gztime:null, navDate:null, gszzl:null, historyNav:[]
-    });
+    };
+    if(existIdx>=0) d.funds[existIdx]=fundObj;
+    else d.funds.push(fundObj);
   });
   sv(d);
   localStorage.setItem(PRESET_VER, '1');
