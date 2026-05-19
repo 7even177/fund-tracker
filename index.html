@@ -1308,15 +1308,15 @@ function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSector
 function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
-// 强制写入正确的 ai_config（每次都更新 geminiKey，保持最新）
+// 写入 ai_config（阿里云 Key 强制更新）
 (function(){
   try{
     const existing = JSON.parse(localStorage.getItem('ai_config')||'{}');
-    existing.geminiKey = 'AIzaSyDvoHW_GqwF0rmsmtyvbFAgCHyRp5-B5Yg';
+    existing.aliyunKey = 'sk-9ce3ec1334c04a2394fd1b217a87226a';
+    existing.geminiKey = existing.geminiKey||'';
     existing.endpoint = existing.endpoint || 'https://api.siliconflow.cn/v1';
     existing.key = existing.key || '';
     existing.model = existing.model || 'Qwen/Qwen3-VL-8B-Instruct';
-    existing.aliyunKey = existing.aliyunKey || '';
     localStorage.setItem('ai_config', JSON.stringify(existing));
   }catch(e){}
 })();
