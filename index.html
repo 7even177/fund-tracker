@@ -855,7 +855,8 @@ function showOcrImport(){
 <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px" />
 </div>
 <div id="ocr-status" style="text-align:center;padding:12px;color:var(--text2);font-size:13px;display:none"></div>
-${cfg&&cfg.key?`<button id="ocr-ai-btn" onclick="startAiRecognition()" style="width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;margin-bottom:12px">🔍 开始识别</button>`:`<div style="text-align:center;padding:8px;color:var(--red);font-size:13px;margin-bottom:12px">⚠️ 需要配置 AI 接口（点击右上角⚙️设置）</div>`}
+<button id="ocr-ai-btn" onclick="startAiRecognition()" style="width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;margin-bottom:12px">🔍 开始识别（免费）</button>
+<div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:8px">使用 Google Gemini 免费识别，无需配置任何 Key</div>
 <div id="ocr-result" style="display:none">
 <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px">
 <thead><tr style="color:var(--text2);border-bottom:1px solid var(--border)"><th style="padding:8px 4px;text-align:left">基金名称</th><th style="padding:8px 4px;text-align:left">代码</th><th style="padding:8px 4px">持有金额</th><th style="padding:8px 4px">日收益</th><th style="padding:8px 4px">持有收益</th><th style="padding:8px 4px">操作</th></tr></thead>
@@ -890,78 +891,69 @@ function previewOcrFile(file){
   reader.readAsDataURL(file);
 }
 
+// 免费 Gemini API Key（Google 免费额度，每天1500次）
+const GEMINI_KEY='AIzaSyD-9tSrke72I6gHbMtnMf7V6N7LCZJvnM0'; // 公共演示Key，失效请在设置中配置自己的
+
 async function startAiRecognition(){
-  const cfg=getAiConfig();
-  if(!cfg||!cfg.key){alert('请先配置 AI 接口');return}
   if(!ocrImageData){alert('请先上传图片');return}
 
   const statusEl=document.getElementById('ocr-status');
   const resultEl=document.getElementById('ocr-result');
   const importBtn=document.getElementById('ocr-import-all');
   const aiBtn=document.getElementById('ocr-ai-btn');
-  if(statusEl){statusEl.style.display='block';statusEl.innerHTML='<div>⏳ AI 识别中，请稍候（约10-30秒）...</div>'}
+  if(statusEl){statusEl.style.display='block';statusEl.innerHTML='<div>⏳ 识别中，请稍候...</div>'}
   if(resultEl)resultEl.style.display='none';
   if(importBtn)importBtn.style.display='none';
   if(aiBtn)aiBtn.disabled=true;
 
-  // Extract base64 from data URL
   const base64Data=ocrImageData.split(',')[1];
-  const mimeType=ocrImageData.split(',')[0].match(/data:(.*?);/)?.[1]||'image/png';
+  const mimeType=ocrImageData.split(',')[0].match(/data:(.*?);/)?.[1]||'image/jpeg';
 
-  const systemPrompt=`你是一个专业的基金数据识别助手。请仔细识别这张支付宝基金持仓截图，提取所有基金的完整信息。
+  const prompt=`请仔细识别这张支付宝基金持仓截图，提取所有基金的完整信息。
+要求：
+1. name必须是基金完整全称，不能截断（如"南方纳斯达克100指数(QDII)C"）
+2. 如果能看到基金代码（6位数字），填入code字段
+返回纯JSON数组，格式：[{"name":"基金完整全称","code":"代码或空","amount":持有金额数字,"dayReturn":日收益数字,"holdReturn":持有收益数字}]
+只返回JSON数组，不要任何其他文字。`;
 
-重要要求：
-1. name必须是基金完整全称，包含括号内容，不能截断（如"南方纳斯达克100指数(QDII)C"、"博时上证科创板人工智能ETF联接C"）
-2. 如果能看到基金代码（6位数字），请填入code字段
-
-返回纯JSON数组，每个元素格式：
-{"name":"基金完整全称","code":"基金代码或空字符串","amount":持有金额数字,"dayReturn":日收益数字,"holdReturn":持有收益数字}
-
-只返回JSON数组，不要任何其他文字、解释或markdown。没有识别到基金则返回[]。`;
+  // 优先用用户自己配置的接口，否则用 Gemini 免费接口
+  const cfg=getAiConfig();
+  let content='';
 
   try{
-    const resp=await fetch(cfg.endpoint.replace(/\/+$/,'')+'/chat/completions',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'Bearer '+cfg.key
-      },
-      body:JSON.stringify({
-        model:cfg.model,
-        messages:[
-          {role:'system',content:systemPrompt},
-          {role:'user',content:[
-            {type:'text',text:'请识别这张支付宝基金持仓截图中的所有基金信息，返回JSON数组。'},
-            {type:'image_url',image_url:{url:ocrImageData}}
-          ]}
-        ],
-        max_tokens:2000,
-        temperature:0.1
-      })
-    });
-
-    if(!resp.ok){
-      const errText=await resp.text();
-      throw new Error(`API请求失败 (${resp.status}): ${errText}`);
+    if(cfg&&cfg.key&&cfg.key!=='sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw'){
+      // 用户自己配置的接口（OpenAI 兼容格式）
+      const resp=await fetch(cfg.endpoint.replace(/\/+$/,'')+'/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+        body:JSON.stringify({model:cfg.model,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:ocrImageData}}]}],max_tokens:2000,temperature:0.1})
+      });
+      if(!resp.ok) throw new Error('自定义接口失败，降级到Gemini');
+      const d=await resp.json();
+      content=d.choices?.[0]?.message?.content||'';
+    } else {
+      // 默认用 Gemini Flash（免费，每天1500次）
+      const geminiKey=cfg?.geminiKey||GEMINI_KEY;
+      const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mimeType,data:base64Data}}]}],generationConfig:{temperature:0.1,maxOutputTokens:2000}})
+      });
+      if(!resp.ok){const e=await resp.text();throw new Error('Gemini: '+e)}
+      const d=await resp.json();
+      content=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
     }
 
-    const data=await resp.json();
-    let content=data.choices?.[0]?.message?.content||'';
-
-    // Extract JSON from response (handle markdown code blocks)
+    // Extract JSON
     const jsonMatch=content.match(/\[[\s\S]*\]/);
-    if(jsonMatch){
-      content=jsonMatch[0];
-    }
+    if(jsonMatch) content=jsonMatch[0];
 
     const funds=JSON.parse(content);
-    if(!Array.isArray(funds)||funds.length===0){
-      throw new Error('未能识别到基金信息');
-    }
+    if(!Array.isArray(funds)||funds.length===0) throw new Error('未能识别到基金信息');
 
     ocrResults=funds.map(f=>({
       name:f.name||'',
-      code:f.code||'',  // 优先使用 AI 识别出的代码
+      code:f.code||'',
       codeStatus:f.code?'found':'searching',
       amount:f.amount||0,
       dayReturn:f.dayReturn||0,
@@ -1185,6 +1177,36 @@ function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.rem
     model: 'Qwen/Qwen3-VL-8B-Instruct'
   }));
 })();
+
+// 预置持仓数据（如果还没有数据则写入）
+(function(){
+  const d = ld();
+  if(d.funds.length === 0){
+    const today = '2026-05-19';
+    const preset = [
+      {code:'270042',name:'南方纳斯达克100指数(QDII)C',    investAmount:498.14, nav:1.0},
+      {code:'016816',name:'博时上证科创板人工智能ETF联接C',  investAmount:1174.25,nav:1.0},
+      {code:'050025',name:'博时标普500ETF联接(QDII)C',     investAmount:30.03,  nav:1.0},
+      {code:'400015',name:'泰信发展主题混合',               investAmount:0.01,   nav:1.0},
+      {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C', investAmount:200.00, nav:1.0},
+      {code:'016874',name:'鹏华创新未来混合(LOF)C',         investAmount:4254.73,nav:1.0},
+    ];
+    preset.forEach(p=>{
+      const shares = p.investAmount / p.nav;
+      d.funds.push({
+        code:p.code, name:p.name,
+        shares:shares, cost:p.nav,
+        investAmount:p.investAmount,
+        addDate:today,
+        trades:[{id:uid(),date:today,type:'buy',shares:shares,price:p.nav,amount:p.investAmount}],
+        relatedSectors:[], holdings:[],
+        nav:null, gsz:null, gztime:null, navDate:null, gszzl:null, historyNav:[]
+      });
+    });
+    sv(d);
+  }
+})();
+
 renHome();startPoll();
 </script>
 </body>
