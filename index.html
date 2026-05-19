@@ -414,11 +414,13 @@ async function pollNav(){
       const r=await fNav(f.code);
       if(r){
         f.name=r.name||f.name;
-        f.nav=parseFloat(r.dwjz)||f.nav;
-        f.gsz=parseFloat(r.gsz)||null;
+        if(r.dwjz) f.nav=parseFloat(r.dwjz)||f.nav;
+        // gsz: 有值就用，没有则 fallback 到 nav（QDII 收盘后无盘中估算，用昨日净值）
+        f.gsz=r.gsz&&r.gsz!=='--'?parseFloat(r.gsz):null;
         f.gztime=r.gztime||null;
         f.navDate=r.jzrq||null;
-        f.gszzl=r.gszzl!==undefined?parseFloat(r.gszzl):null;
+        // gszzl: 明确有值才赋（包括0和负数）
+        f.gszzl=(r.gszzl!==undefined&&r.gszzl!==null&&r.gszzl!=='')?parseFloat(r.gszzl):null;
         // 修正成本：如果成本是1.0但实际净值差异很大，用实际净值重置成本（只在首次拉到数据时）
         if(f.cost===1&&f.nav&&Math.abs(f.nav-1)>0.1){
           // 用投入金额和实际净值反推份额
@@ -484,16 +486,32 @@ function renHome(){
   document.getElementById('ta').textContent=fmt(ta);
   setT('tp',tp);setT('tpr',tpr,'%');setT('tdp',tdpVal);setT('tdpr',tdr,'%');
   // 生成基金标签
+  // 板块数据（每只基金所属板块）
+  const FUND_SECTORS={
+    '016453':['美股科技','纳斯达克100','QDII'],
+    '023521':['科创板','人工智能','ETF联接'],
+    '006075':['美股','标普500','QDII','ETF联接'],
+    '400015':['新能源','汽车','A股混合'],
+    '024418':['科创板','半导体','芯片','ETF联接'],
+    '501205':['科技成长','混合型','LOF'],
+    '016874':['科技成长','混合型'],
+  };
   function fundTags(f){
-    const tags=[];
-    if(f.name&&f.name.includes('ETF')) tags.push('ETF联接');
-    else if(f.name&&f.name.includes('混合')) tags.push('混合型');
-    else if(f.name&&f.name.includes('指数')) tags.push('指数型');
-    else if(f.name&&f.name.includes('债券')) tags.push('债券型');
-    else tags.push('基金');
-    if(f.name&&f.name.includes('QDII')) tags.push('QDII');
-    if(f.name&&f.name.includes('LOF')) tags.push('LOF');
-    return tags.map(t=>`<span style="background:rgba(0,122,255,0.1);color:#007aff;font-size:10px;padding:1px 5px;border-radius:3px;margin-right:4px">${t}</span>`).join('');
+    const sectors=FUND_SECTORS[f.code]||[];
+    // 基金类型标签
+    const typeTags=[];
+    if(f.name&&f.name.includes('ETF')) typeTags.push({label:'ETF联接',color:'#007aff',bg:'rgba(0,122,255,0.1)'});
+    else if(f.name&&f.name.includes('混合')) typeTags.push({label:'混合型',color:'#007aff',bg:'rgba(0,122,255,0.1)'});
+    else if(f.name&&f.name.includes('指数')) typeTags.push({label:'指数型',color:'#007aff',bg:'rgba(0,122,255,0.1)'});
+    else if(f.name&&f.name.includes('债券')) typeTags.push({label:'债券型',color:'#007aff',bg:'rgba(0,122,255,0.1)'});
+    if(f.name&&f.name.includes('QDII')) typeTags.push({label:'QDII',color:'#ff9500',bg:'rgba(255,149,0,0.1)'});
+    if(f.name&&f.name.includes('LOF')) typeTags.push({label:'LOF',color:'#007aff',bg:'rgba(0,122,255,0.1)'});
+    // 板块标签（绿色系，与类型标签区分）
+    const sectorTags=sectors.filter(s=>!['ETF联接','混合型','LOF','QDII'].includes(s))
+      .map(s=>({label:s,color:'#34c759',bg:'rgba(52,199,89,0.1)'}));
+    return [...typeTags,...sectorTags]
+      .map(t=>`<span style="background:${t.bg};color:${t.color};font-size:10px;padding:1px 6px;border-radius:3px;margin-right:4px;display:inline-block">${t.label}</span>`)
+      .join('');
   }
   const cc2=v=>v===null?'var(--text2)':v>0?'var(--red)':v<0?'var(--green)':'var(--text2)';
   const fmt2=v=>v===null?'--':`${v>0?'+':''}${v.toFixed(2)}`;
