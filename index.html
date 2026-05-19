@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>基金持仓追踪</title>
 <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f0b429">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="基金追踪">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#f0b429">
+<title>基金持仓追踪</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 
 <style>
@@ -1462,9 +1462,11 @@ renHome();startPoll();
 </script>
 <script>
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/fund-tracker/sw.js')
-    .then(()=>console.log('SW registered'))
-    .catch(e=>console.warn('SW failed',e));
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/fund-tracker/sw.js')
+      .then(r=>console.log('✅ SW registered',r.scope))
+      .catch(e=>console.warn('SW failed',e));
+  });
 }
 </script>
 </body>
