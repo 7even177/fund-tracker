@@ -251,7 +251,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
 <div class="mo" id="mo"><div class="md" id="mc"></div></div>
 <script>
 let curPg='home',curCode=null,curTab='sec',navTimer=null,intradayTimer=null,charts={};
-const RAW_PROXY='https://api.allorigins.win/raw?url=';
+const RAW_PROXY='https://api.codetabs.com/v1/proxy/?quest=';
 const intradayCache={};
 
 function ld(){try{const d=JSON.parse(localStorage.getItem('ft_data'));if(d&&d.funds)return d}catch(e){}return{funds:[]}}
@@ -336,12 +336,21 @@ function startIntradayPoll(secs){
 }
 
 /* ===== Net Value ===== */
+const NAV_PROXIES=[
+  u=>`https://api.codetabs.com/v1/proxy/?quest=${u}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+];
 async function fNav(c){
-  try{
-    const resp=await fetch(RAW_PROXY+encodeURIComponent(`https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`));
-    const text=await resp.text();const match=text.match(/jsonpgz\((.*?)\)/);
-    if(match)return JSON.parse(match[1]);
-  }catch(e){console.warn('fNav failed',c,e)}
+  const url=`https://fundgz.1234567.com.cn/js/${c}.js?rt=${Date.now()}`;
+  for(const mkProxy of NAV_PROXIES){
+    try{
+      const resp=await fetch(mkProxy(url),{signal:AbortSignal.timeout(6000)});
+      const text=await resp.text();
+      const match=text.match(/jsonpgz\((.*?)\)/);
+      if(match)return JSON.parse(match[1]);
+    }catch(e){console.warn('fNav proxy failed',c,e.message)}
+  }
   return null;
 }
 
