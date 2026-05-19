@@ -815,14 +815,15 @@ function saveAiConfig(endpoint,key,model,geminiKey,aliyunKey){localStorage.setIt
 
 function showSettings(){
   const cfg=getAiConfig()||{endpoint:'https://api.siliconflow.cn/v1',key:'',model:'Qwen/Qwen3-VL-8B-Instruct',geminiKey:'',aliyunKey:''};
-  modal(`<h3>⚙️ 识图设置</h3>
+  modal(`<h3>⚙️ 设置</h3>
 <div style="background:rgba(247,162,57,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text2)">
-📷 <b style="color:var(--accent)">推荐：Gemini 免费识图</b><br>
-去 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> 免费获取 Key，粘贴到下方第一行即可。
+📷 <b style="color:var(--accent)">推荐：阿里云 qwen-vl-plus（国内免费，无需翻墙）</b><br>
+去 <a href="https://dashscope.aliyun.com" target="_blank" style="color:var(--accent)">dashscope.aliyun.com</a> 注册获取 Key，有免费额度。
 </div>
-<div class="fg"><label>🆓 Gemini API Key（免费，推荐）</label><input id="s-gkey" value="${eh(cfg.geminiKey||'')}" placeholder="AIzaSy..." type="password" /></div>
-<div class="fg"><label>🆓 阿里云 API Key（免费额度）</label><input id="s-aliyun" value="${eh(cfg.aliyunKey||'')}" placeholder="sk-..." type="password" /></div>
-<div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px;font-size:12px;color:var(--text2)">— 或使用自定义 AI 接口 —</div>
+<div class="fg"><label>🆓 阿里云 API Key（国内免费，推荐）</label><input id="s-aliyun" value="${eh(cfg.aliyunKey||'')}" placeholder="sk-..." type="password" /></div>
+<div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px;font-size:12px;color:var(--text2)">— 或使用其他接口 —</div>
+<div class="fg"><label>🆓 Gemini API Key（需科学上网）</label><input id="s-gkey" value="${eh(cfg.geminiKey||'')}" placeholder="AIzaSy..." type="password" /></div>
+<div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px;font-size:12px;color:var(--text2)">— 自定义 AI 接口 —</div>
 <div class="fg"><label>接口地址</label><input id="s-ep" value="${eh(cfg.endpoint)}" placeholder="https://api.openai.com/v1" /></div>
 <div class="fg"><label>API Key</label><input id="s-key" value="${eh(cfg.key)}" placeholder="sk-..." type="password" /></div>
 <div class="fg"><label>模型</label><input id="s-model" value="${eh(cfg.model)}" placeholder="gpt-4o" /></div>
@@ -836,8 +837,6 @@ function doSaveSettings(){
   const aliyun=document.getElementById('s-aliyun').value.trim();
   saveAiConfig(ep,key,model,gkey,aliyun);
   hModal();
-  const ocrBtn=document.getElementById('ocr-ai-btn');
-  if(ocrBtn)ocrBtn.style.display='block';
 }
 
 /* ===== Fund Code Search ===== */
@@ -893,6 +892,7 @@ let ocrResults=[];
 
 function showOcrImport(){
   const cfg=getAiConfig();
+  const hasKey=(cfg?.aliyunKey&&cfg.aliyunKey.length>5)||(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))||(cfg?.key&&cfg.key.length>10);
   modal(`<h3>📷 支付宝截图批量导入</h3>
 <div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
   <button id="ocr-tab-ai" onclick="switchOcrTab('ai')" style="flex:1;padding:10px;background:var(--accent);color:#000;border:none;cursor:pointer;font-size:13px;font-weight:600">📸 AI识图</button>
@@ -901,15 +901,15 @@ function showOcrImport(){
 <div id="ocr-panel-ai">
 <div class="upload-zone" id="uz" onclick="document.getElementById('ocr-file').click()">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;opacity:.4;margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-<p>点击或拖拽上传支付宝截图</p>
-<p style="font-size:11px;margin-top:4px;color:var(--text2)">支持拖拽上传</p>
+<p>📸 点击上传截图（自动识别）</p>
+<p style="font-size:11px;margin-top:4px;color:var(--text2)">支持支付宝基金持仓截图</p>
 <input type="file" id="ocr-file" accept="image/*" onchange="handleOcrFile(this)" />
 </div>
 <div id="ocr-preview" style="display:none;text-align:center;margin-bottom:12px">
 <img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px" />
 </div>
-<button id="ocr-ai-btn" onclick="startAiRecognition()" style="width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;margin-bottom:12px">🔍 开始识别（免费）</button>
-<div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:8px">使用 AI 识图（支持 Gemini / 阿里云 / 自定义接口）</div>
+${hasKey?'':'<button onclick="showSettings()" style="width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;margin-bottom:12px">⚙️ 去设置 AI Key（免费）</button>'}
+<div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:8px">${hasKey?'✅ AI已配置，上传后自动识别':'使用 AI 识图（需配置 Gemini / 阿里云 / 自定义接口）'}</div>
 </div>
 <div id="ocr-panel-txt" style="display:none">
 <textarea id="ocr-paste-txt" placeholder="把手机长按支付宝截图识别出的文字粘贴到这里..." style="width:100%;height:150px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:13px;resize:vertical;font-family:inherit"></textarea>
@@ -938,21 +938,19 @@ function handleOcrFile(el){if(el.files.length)previewOcrFile(el.files[0])}
 
 function previewOcrFile(file){
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async function(e){
     ocrImageData=e.target.result;
     const prev=document.getElementById('ocr-preview');
     const img=document.getElementById('ocr-img');
     if(prev)prev.style.display='block';
     if(img)img.src=ocrImageData;
-    // Auto-start recognition if AI config exists
+    // 自动触发识别
     const cfg=getAiConfig();
-    if(cfg&&cfg.key)startAiRecognition();
+    const hasKey=(cfg?.aliyunKey&&cfg.aliyunKey.length>5)||(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))||(cfg?.key&&cfg.key.length>10);
+    if(hasKey){await startAiRecognition();}
   };
   reader.readAsDataURL(file);
 }
-
-// 免费 Gemini API Key（Google 免费额度，每天1500次）
-const GEMINI_KEY=''; // 在设置中填入你的 Gemini API Key
 
 async function startAiRecognition(){
   if(!ocrImageData){alert('请先上传图片');return}
@@ -976,16 +974,26 @@ async function startAiRecognition(){
 返回纯JSON数组，格式：[{"name":"基金完整全称","code":"代码或空","amount":持有金额数字,"dayReturn":日收益数字,"holdReturn":持有收益数字}]
 只返回JSON数组，不要任何其他文字。`;
 
-  // 优先用用户自己配置的接口，否则用 Gemini 免费接口
+  // 优先用用户自己配置的接口，否则用阿里云/ Gemini 免费接口
   const cfg=getAiConfig();
   let content='';
 
   try{
+    const aliyunKey=cfg?.aliyunKey&&cfg.aliyunKey.length>5?cfg.aliyunKey:'';
     const geminiKey=(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))?cfg.geminiKey:'';
     const hasCustom=cfg&&cfg.key&&cfg.key.length>10&&cfg.endpoint&&cfg.endpoint.startsWith('http');
-    const hasAliyun=cfg?.aliyunKey&&cfg.aliyunKey.length>5;
-    if(geminiKey){
-      // 优先用 Gemini（免费）
+    if(aliyunKey){
+      // 优先：阿里云 qwen-vl-plus（国内可访问，有免费额度）
+      const resp=await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+aliyunKey},
+        body:JSON.stringify({model:'qwen-vl-plus',messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:ocrImageData}}]}],max_tokens:2000})
+      });
+      if(!resp.ok){const e=await resp.text();throw new Error('阿里云: '+e)}
+      const d=await resp.json();
+      content=d.choices?.[0]?.message?.content||'';
+    } else if(geminiKey){
+      // 备用：Gemini（免费，需科学上网）
       const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -1004,19 +1012,9 @@ async function startAiRecognition(){
       if(!resp.ok){const e=await resp.text();throw new Error('自定义接口: '+e)}
       const d=await resp.json();
       content=d.choices?.[0]?.message?.content||'';
-    } else if(hasAliyun){
-      // 阿里云通义千问VL
-      const resp=await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.aliyunKey},
-        body:JSON.stringify({model:'qwen-vl-plus',messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:ocrImageData}}]}],max_tokens:2000,temperature:0.1})
-      });
-      if(!resp.ok){const e=await resp.text();throw new Error('阿里云: '+e)}
-      const d=await resp.json();
-      content=d.choices?.[0]?.message?.content||'';
     } else {
       // 无可用配置
-      throw new Error('请先在设置(⚙️)中填入 Gemini API Key 或 阿里云 API Key\nGemini: aistudio.google.com/apikey（免费）\n阿里云: dashscope.console.aliyun.com（免费额度）');
+      throw new Error('请先在设置(⚙️)中配置 AI Key\n推荐：阿里云 qwen-vl-plus 有免费额度\n前往 dashscope.aliyun.com 注册');
     }
 
     // Extract JSON
