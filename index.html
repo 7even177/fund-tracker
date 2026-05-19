@@ -147,6 +147,33 @@ h1 {
 .val.profit { color: var(--profit); }
 .val.loss { color: var(--loss); }
 
+/* 分时走势图 */
+.intraday-chart {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  position: relative;
+  height: 130px;
+}
+.intraday-chart canvas {
+  max-height: 120px;
+}
+.intraday-placeholder {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+/* 净值标签 */
+.nav-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
 /* 定投区域 */
 .sip-section {
   margin-top: 16px;
@@ -259,6 +286,7 @@ h1 {
   .summary-card { grid-template-columns: repeat(2, 1fr); padding: 16px; }
   .fund-stats { grid-template-columns: repeat(2, 1fr); }
   .form-group { min-width: 100%; }
+  .intraday-chart { height: 110px; }
 }
 </style>
 </head>
@@ -305,15 +333,192 @@ h1 {
 const STORAGE_KEY = 'fundTracker_v2';
 let funds = [];
 let chartInstance = null;
+let intradayChartInstances = {};
 
-// ========== 数据持久化 ==========
-function loadFunds() {
-  try {
-    funds = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  } catch { funds = []; }
+// ========== JSONP 通用函数 ==========
+function jsonpFetch(srcUrl, callbackName, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { cleanup(); reject(new Error('JSONP timeout')); }, timeoutMs);
+    function cleanup() {
+      clearTimeout(timer);
+      if (window[callbackName]) delete window[callbackName];
+      const s = document.getElementById('jsonp_' + callbackName);
+      if (s && s.parentNode) s.parentNode.removeChild(s);
+    }
+    window[callbackName] = function(data) {
+      cleanup();
+      resolve(data);
+    };
+    const script = document.createElement('script');
+    script.id = 'jsonp_' + callbackName;
+    script.src = srcUrl;
+    script.onerror = () => { cleanup(); reject(new Error('JSONP load error')); };
+    document.head.appendChild(script);
+  });
 }
-function saveFunds() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(funds));
+
+// 通过代理 fetch + 文本解析 JSONP
+async function proxyJsonpFetch(url, callbackName, proxyFn) {
+  const resp = await fetch(proxyFn(url), { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error('Proxy HTTP ' + resp.status);
+  const text = await resp.text();
+  // 匹配 callbackName({...}) 或 jQuery({...}) 等
+  const regex = new RegExp(callbackName + '\\s*\\(\\s*(\\{.*\\})\\s*\\)');
+  const match = text.match(regex);
+  if (match) return JSON.parse(match[1]);
+  // 尝试宽松匹配：找到最外层 {}
+  const loose = text.match(/\{[\s\S]*\}/);
+  if (loose) return JSON.parse(loose[0]);
+  throw new Error('Proxy response parse failed');
+}
+
+function alloriginsProxy(url) {
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+}
+function corsproxyIo(url) {
+  return `https://corsproxy.io/?${encodeURIComponent(url)}`;
+}
+
+// ========== 多源获取实时估值 ==========
+async function fetchRealtimeNAV(code) {
+  const url = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`;
+  const cb = 'jsonpgz';
+
+  // 1) 主接口：直接 JSONP
+  try {
+    return await jsonpFetch(url, cb, 5000);
+  } catch(e) { console.warn('JSONP direct failed:', e.message); }
+
+  // 2) allorigins 代理
+  try {
+    return await proxyJsonpFetch(url, cb, alloriginsProxy);
+  } catch(e) { console.warn('allorigins failed:', e.message); }
+
+  // 3) corsproxy.io 代理
+  try {
+    return await proxyJsonpFetch(url, cb, corsproxyIo);
+  } catch(e) { console.warn('corsproxy.io failed:', e.message); }
+
+  return null;
+}
+
+// ========== 多源获取历史净值 ==========
+async function fetchHistoryNAV(code) {
+  const apiUrl = `https://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=${code}&pageIndex=1&pageSize=200&startDate=&endDate=&_=${Date.now()}`;
+
+  // 历史接口优先用 allorigins 代理
+  try {
+    return await proxyJsonpFetch(apiUrl, 'jQuery', alloriginsProxy);
+  } catch(e) { console.warn('History allorigins failed:', e.message); }
+
+  try {
+    return await proxyJsonpFetch(apiUrl, 'jQuery', corsproxyIo);
+  } catch(e) { console.warn('History corsproxy.io failed:', e.message); }
+
+  return { Data: { LSJZList: [] } };
+}
+
+// ========== 多源获取分时估值数据 ==========
+async function fetchIntradayData(code) {
+  // 方案1: FundVarietieValuationV2 接口
+  const apiUrl = `http://api.fund.eastmoney.com/f10/FundVarietieValuationV2?callback=jQuery&fundCode=${code}&type=1&_=${Date.now()}`;
+  try {
+    const result = await proxyJsonpFetch(apiUrl, 'jQuery', alloriginsProxy);
+    // 解析分时数据
+    const intraday = parseIntradayFromValuation(result, code);
+    if (intraday && intraday.length > 0) return intraday;
+  } catch(e) { console.warn('Intraday V2 allorigins failed:', e.message); }
+
+  try {
+    const result = await proxyJsonpFetch(apiUrl, 'jQuery', corsproxyIo);
+    const intraday = parseIntradayFromValuation(result, code);
+    if (intraday && intraday.length > 0) return intraday;
+  } catch(e) { console.warn('Intraday V2 corsproxy.io failed:', e.message); }
+
+  // 方案2: 尝试 QDII 分时接口
+  const qdiiUrl = `https://j4.fund.eastmoney.com/qdii/ljjz/${code}.js?rt=${Date.now()}`;
+  try {
+    const result = await proxyJsonpFetch(qdiiUrl, `${code}_fsjz`, alloriginsProxy);
+    const intraday = parseQdiiIntraday(result);
+    if (intraday && intraday.length > 0) return intraday;
+  } catch(e) { console.warn('QDII intraday failed:', e.message); }
+
+  // 方案3: 返回 null，由调用方用历史净值+当天估值替代
+  return null;
+}
+
+function parseIntradayFromValuation(result, code) {
+  // 尝试多种可能的返回结构
+  if (!result) return null;
+
+  // 常见结构: { Data: { FundVarietieValuation: [{ time, gz, ... }] } }
+  if (result.Data && result.Data.FundVarietieValuation) {
+    const list = result.Data.FundVarietieValuation;
+    if (Array.isArray(list) && list.length > 0) {
+      return list.map(item => ({
+        time: item.time || item.TIME || '',
+        value: parseFloat(item.gz || item.value || item.GZ || 0),
+      })).filter(d => d.time && !isNaN(d.value));
+    }
+  }
+
+  // 也可能是直接数组
+  if (Array.isArray(result)) {
+    return result.map(item => ({
+      time: item.time || item.TIME || '',
+      value: parseFloat(item.gz || item.value || item.GZ || 0),
+    })).filter(d => d.time && !isNaN(d.value));
+  }
+
+  // 尝试从结果中找到数组字段
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object') {
+      return val.map(item => ({
+        time: item.time || item.TIME || '',
+        value: parseFloat(item.gz || item.value || item.GZ || 0),
+      })).filter(d => d.time && !isNaN(d.value));
+    }
+  }
+
+  return null;
+}
+
+function parseQdiiIntraday(result) {
+  if (!result) return null;
+  // 常见结构: { data: [{ jzrq, dwjz }] }
+  const arr = result.data || result.Data || result.list || result;
+  if (Array.isArray(arr)) {
+    return arr.map(item => ({
+      time: item.jzrq || item.date || '',
+      value: parseFloat(item.dwjz || item.value || 0),
+    })).filter(d => d.time && !isNaN(d.value));
+  }
+  return null;
+}
+
+// ========== 交易时间判断 ==========
+function isTradingDay() {
+  const d = new Date();
+  const day = d.getDay();
+  if (day === 0 || day === 6) return false; // 周末
+  // TODO: 节假日判断可以后续加
+  return true;
+}
+
+function isTradingHours() {
+  const now = new Date();
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const mins = h * 60 + m;
+  // 交易时间: 09:30-11:30, 13:00-15:00
+  return (mins >= 570 && mins <= 690) || (mins >= 780 && mins <= 900);
+}
+
+// ========== 获取基金名称 ==========
+async function fetchFundName(code) {
+  const data = await fetchRealtimeNAV(code);
+  return data ? data.name : null;
 }
 
 // ========== 工具函数 ==========
@@ -328,53 +533,6 @@ function calcWeightedAvgCost(sipRecords) {
   let totalAmount = 0, totalShares = 0;
   sipRecords.forEach(r => { totalAmount += r.amount; totalShares += r.shares; });
   return totalShares > 0 ? totalAmount / totalShares : 0;
-}
-
-// ========== 获取基金名称 ==========
-async function fetchFundName(code) {
-  try {
-    const url = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const resp = await fetch(proxyUrl);
-    const text = await resp.text();
-    // jsonpgz({"fundcode":"000001","name":"华夏成长",...})
-    const match = text.match(/jsonpgz\((\{.*?\})\)/);
-    if (match) {
-      const data = JSON.parse(match[1]);
-      return data.name;
-    }
-  } catch(e) { console.warn('Fetch name failed:', e); }
-  return null;
-}
-
-// ========== 获取实时估值 ==========
-async function fetchRealtimeNAV(code) {
-  try {
-    const url = `https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-    const resp = await fetch(proxyUrl);
-    const text = await resp.text();
-    const match = text.match(/jsonpgz\((\{.*?\})\)/);
-    if (match) return JSON.parse(match[1]);
-  } catch(e) { console.warn('Fetch NAV failed:', e); }
-  return null;
-}
-
-// ========== 获取历史净值 ==========
-async function fetchHistoryNAV(code) {
-  try {
-    const apiUrl = `https://api.fund.eastmoney.com/f10/lsjz?callback=jQuery&fundCode=${code}&pageIndex=1&pageSize=200&startDate=&endDate=&_=${Date.now()}`;
-    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-    const resp = await fetch(proxyUrl);
-    const text = await resp.text();
-    // jQuery({ "Data": { "LSJZList": [...] }, ...})
-    const match = text.match(/jQuery\((\{.*?\})\)/);
-    if (match) {
-      const data = JSON.parse(match[1]);
-      return data.Data?.LSJZList || [];
-    }
-  } catch(e) { console.warn('Fetch history failed:', e); }
-  return [];
 }
 
 // ========== 添加基金 ==========
@@ -395,7 +553,10 @@ async function addFund() {
     nav: null,
     navDate: null,
     gzgsz: null,
+    gzDate: null,
     historyNav: [],
+    intradayData: null,
+    intradayTime: null,
     lastUpdate: Date.now()
   };
   funds.push(fund);
@@ -406,7 +567,6 @@ async function addFund() {
   document.getElementById('inputCost').value = '';
 
   render();
-  // 后台获取净值
   refreshFund(code);
 }
 
@@ -415,6 +575,11 @@ function removeFund(code) {
   if (!confirm('确定删除该基金？')) return;
   funds = funds.filter(f => f.code !== code);
   saveFunds();
+  // 销毁对应的分时图
+  if (intradayChartInstances[code]) {
+    intradayChartInstances[code].destroy();
+    delete intradayChartInstances[code];
+  }
   render();
 }
 
@@ -425,17 +590,37 @@ async function refreshFund(code) {
   fund.refreshing = true;
   render();
 
-  const data = await fetchRealtimeNAV(code);
-  if (data) {
+  // 并行获取实时估值和分时数据
+  const [navData, intraday] = await Promise.allSettled([
+    fetchRealtimeNAV(code),
+    fetchIntradayData(code),
+  ]);
+
+  if (navData.status === 'fulfilled' && navData.value) {
+    const data = navData.value;
     fund.name = data.name || fund.name;
-    fund.nav = parseFloat(data.dwjz) || fund.nav;
-    fund.navDate = data.jzrq;
-    fund.gzgsz = parseFloat(data.gsz);
+    // 优先显示 gsz（估算净值），其次 dwjz（确认净值）
+    if (data.gsz) {
+      fund.gzgsz = parseFloat(data.gsz);
+      fund.gzDate = data.gztime || null; // 如 "15:00"
+    }
+    if (data.dwjz) {
+      fund.nav = parseFloat(data.dwjz);
+      fund.navDate = data.jzrq || null;
+    }
     fund.lastUpdate = Date.now();
   }
+
+  if (intraday.status === 'fulfilled' && intraday.value && intraday.value.length > 0) {
+    fund.intradayData = intraday.value;
+    fund.intradayTime = todayStr();
+  }
+
   fund.refreshing = false;
   saveFunds();
   render();
+  // 分时图在 render 后渲染
+  setTimeout(() => renderIntradayChart(code), 100);
 }
 
 async function refreshAll() {
@@ -462,11 +647,11 @@ function addSipRecord(code) {
   if (!date || isNaN(shares) || isNaN(amount)) { alert('请填写完整'); return; }
 
   fund.sipRecords.push({ date, shares, amount });
-  // 重新计算加权平均成本
   fund.cost = calcWeightedAvgCost(fund.sipRecords);
   fund.shares = fund.sipRecords.reduce((s, r) => s + r.shares, 0);
   saveFunds();
   render();
+  setTimeout(() => renderIntradayChart(code), 100);
 }
 
 function deleteSipRecord(code, idx) {
@@ -477,6 +662,7 @@ function deleteSipRecord(code, idx) {
   fund.shares = fund.sipRecords.reduce((s, r) => s + r.shares, 0);
   saveFunds();
   render();
+  setTimeout(() => renderIntradayChart(code), 100);
 }
 
 // ========== 渲染 ==========
@@ -492,9 +678,9 @@ function renderSummary() {
 
   let totalCost = 0, totalMarket = 0;
   funds.forEach(f => {
-    const nav = f.nav || f.gzgsz || 0;
+    const displayNav = f.gzgsz || f.nav || 0;
     const costVal = f.cost * f.shares;
-    const marketVal = nav * f.shares;
+    const marketVal = displayNav * f.shares;
     totalCost += costVal;
     totalMarket += marketVal;
   });
@@ -523,12 +709,24 @@ function renderCards() {
 
   let html = '';
   funds.forEach(f => {
-    const nav = f.nav || f.gzgsz || 0;
-    const marketVal = nav * f.shares;
+    // 净值显示逻辑：优先 gsz（估算净值），其次 dwjz（确认净值）
+    let displayNav, navLabel, navDateStr;
+    if (f.gzgsz) {
+      displayNav = f.gzgsz;
+      navDateStr = f.gzDate ? `实时估值 ${f.gzDate}` : '实时估值';
+    } else if (f.nav) {
+      displayNav = f.nav;
+      navDateStr = f.navDate ? `净值 ${f.navDate}` : '净值';
+    } else {
+      displayNav = null;
+      navDateStr = '--';
+    }
+
+    const marketVal = displayNav ? displayNav * f.shares : 0;
     const costVal = f.cost * f.shares;
-    const pl = marketVal - costVal;
-    const plPct = costVal > 0 ? pl / costVal : 0;
-    const cls = profitClass(pl);
+    const pl = displayNav ? marketVal - costVal : null;
+    const plPct = costVal > 0 && pl !== null ? pl / costVal : null;
+    const cls = profitClass(pl || 0);
 
     const sipTotalShares = f.sipRecords.reduce((s, r) => s + r.shares, 0);
     const sipTotalAmount = f.sipRecords.reduce((s, r) => s + r.amount, 0);
@@ -546,15 +744,23 @@ function renderCards() {
         </div>
       </div>
       <div class="fund-stats">
-        <div class="fund-stat"><label>最新净值</label><div class="val">${f.nav ? fmt(f.nav, 4) : (f.gzgsz ? fmt(f.gzgsz, 4) : '--')}</div></div>
+        <div class="fund-stat">
+          <label>最新净值</label>
+          <div class="val">${displayNav !== null ? fmt(displayNav, 4) : '--'}</div>
+          <div class="nav-label">${navDateStr}</div>
+        </div>
         <div class="fund-stat"><label>持仓份额</label><div class="val">${fmt(f.shares)}</div></div>
-        <div class="fund-stat"><label>当前市值</label><div class="val">${fmt(marketVal)}</div></div>
+        <div class="fund-stat"><label>当前市值</label><div class="val">${displayNav !== null ? fmt(marketVal) : '--'}</div></div>
         <div class="fund-stat"><label>持仓成本</label><div class="val">${fmt(costVal)}</div></div>
         <div class="fund-stat"><label>成本价</label><div class="val">${fmt(f.cost, 4)}</div></div>
-        <div class="fund-stat"><label>盈亏金额</label><div class="val ${cls}">${pl >= 0 ? '+' : ''}${fmt(pl)}</div></div>
-        <div class="fund-stat"><label>盈亏比例</label><div class="val ${cls}">${plPct >= 0 ? '+' : ''}${pct(plPct)}</div></div>
-        <div class="fund-stat"><label>净值日期</label><div class="val">${f.navDate || '--'}</div></div>
+        <div class="fund-stat"><label>盈亏金额</label><div class="val ${cls}">${pl !== null ? (pl >= 0 ? '+' : '') + fmt(pl) : '--'}</div></div>
+        <div class="fund-stat"><label>盈亏比例</label><div class="val ${cls}">${plPct !== null ? (plPct >= 0 ? '+' : '') + pct(plPct) : '--'}</div></div>
       </div>
+      <!-- 分时走势图 -->
+      <div class="intraday-chart">
+        <canvas id="intraday_${f.code}"></canvas>
+      </div>
+      <!-- 定投区域 -->
       <div class="sip-section">
         <span id="sipToggle_${f.code}" class="sip-toggle" onclick="event.stopPropagation(); toggleSipForm('${f.code}')">定投记录 (${f.sipRecords.length})</span>
         <div id="sipForm_${f.code}" class="sip-form" onclick="event.stopPropagation()">
@@ -581,7 +787,162 @@ function renderCards() {
   container.innerHTML = html;
 }
 
-// ========== 走势图 ==========
+// ========== 渲染分时走势图 ==========
+function renderIntradayChart(code) {
+  const fund = funds.find(f => f.code === code);
+  if (!fund) return;
+
+  const canvas = document.getElementById(`intraday_${code}`);
+  if (!canvas) return;
+
+  // 销毁旧图
+  if (intradayChartInstances[code]) {
+    intradayChartInstances[code].destroy();
+    delete intradayChartInstances[code];
+  }
+
+  const ctx = canvas.getContext('2d');
+
+  // 优先用分时数据
+  if (fund.intradayData && fund.intradayData.length > 0) {
+    const data = fund.intradayData;
+    const labels = data.map(d => d.time);
+    const values = data.map(d => d.value);
+
+    // 添加一条前一日收盘净值参考线（如果有的话）
+    const prevNav = fund.nav || null;
+
+    intradayChartInstances[code] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: '盘中估值',
+          data: values,
+          borderColor: '#4fc3f7',
+          backgroundColor: 'rgba(79,195,247,0.08)',
+          borderWidth: 1.5,
+          fill: true,
+          pointRadius: 0,
+          tension: 0.1,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 600 },
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#16213e',
+            titleColor: '#e0e0e0',
+            bodyColor: '#a0a0b0',
+            borderColor: '#2a2a4a',
+            borderWidth: 1,
+            callbacks: {
+              label: (ctx) => `估值: ${ctx.parsed.y?.toFixed(4)}`,
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#a0a0b0', font: { size: 10 }, maxTicksLimit: 6, maxRotation: 0 },
+            grid: { color: 'rgba(255,255,255,0.03)' }
+          },
+          y: {
+            ticks: { color: '#a0a0b0', font: { size: 10 } },
+            grid: { color: 'rgba(255,255,255,0.05)' }
+          }
+        }
+      }
+    });
+    return;
+  }
+
+  // 退而求其次：用历史净值最近30天 + 当天估值
+  const history = fund.historyNav || [];
+  const displayNav = fund.gzgsz || fund.nav;
+
+  if (history.length > 0 || displayNav) {
+    let labels = [], values = [];
+
+    if (history.length > 0) {
+      // 取最近30天
+      const recent = history.slice(0, 30).reverse();
+      labels = recent.map(h => h.FSRQ.slice(5)); // 只取 MM-DD
+      values = recent.map(h => parseFloat(h.DWJZ));
+    }
+
+    // 如果不在交易时间且有当天估值，追加一个点
+    if (displayNav) {
+      const todayLabel = new Date().toISOString().slice(5);
+      labels.push(todayLabel);
+      values.push(displayNav);
+    }
+
+    if (labels.length > 0) {
+      intradayChartInstances[code] = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: '近期净值',
+            data: values,
+            borderColor: '#4fc3f7',
+            backgroundColor: 'rgba(79,195,247,0.08)',
+            borderWidth: 1.5,
+            fill: true,
+            pointRadius: labels.length > 5 ? 0 : 3,
+            tension: 0.1,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 600 },
+          interaction: { intersect: false, mode: 'index' },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#16213e',
+              titleColor: '#e0e0e0',
+              bodyColor: '#a0a0b0',
+              borderColor: '#2a2a4a',
+              borderWidth: 1,
+              callbacks: {
+                label: (ctx) => `净值: ${ctx.parsed.y?.toFixed(4)}`,
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#a0a0b0', font: { size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+              grid: { color: 'rgba(255,255,255,0.03)' }
+            },
+            y: {
+              ticks: { color: '#a0a0b0', font: { size: 10 } },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            }
+          }
+        }
+      });
+      return;
+    }
+  }
+
+  // 无数据：显示占位
+  let placeholderText = '暂无数据';
+  if (!isTradingDay()) {
+    placeholderText = '非交易日，无盘中数据';
+  } else if (!isTradingHours()) {
+    placeholderText = '盘前/盘后，暂无盘中数据';
+  }
+
+  canvas.parentElement.innerHTML = `<div class="intraday-placeholder">${placeholderText}</div>`;
+}
+
+// ========== 历史走势图（模态框） ==========
 async function openChart(code) {
   const fund = funds.find(f => f.code === code);
   if (!fund) return;
@@ -591,7 +952,8 @@ async function openChart(code) {
 
   // 加载历史数据（如果没有缓存或过期）
   if (!fund.historyNav || fund.historyNav.length === 0) {
-    fund.historyNav = await fetchHistoryNAV(code);
+    const result = await fetchHistoryNAV(code);
+    fund.historyNav = result.Data?.LSJZList || result.LSJZList || [];
     saveFunds();
   }
 
@@ -711,11 +1073,12 @@ function renderNavTable(fund) {
   sorted.forEach(h => {
     const growth = h.JZZZL ? (parseFloat(h.JZZZL) > 0 ? '+' : '') + h.JZZZL + '%' : '--';
     const growthClass = h.JZZZL && parseFloat(h.JZZZL) > 0 ? 'profit' : h.JZZZL && parseFloat(h.JZZZL) < 0 ? 'loss' : '';
+    const colorVar = growthClass === 'profit' ? 'profit' : growthClass === 'loss' ? 'loss' : 'text-secondary';
     html += `<tr>
       <td>${h.FSRQ}</td>
       <td>${h.DWJZ}</td>
       <td>${h.LJJZ}</td>
-      <td class="${growthClass}" style="color:var(--${growthClass === 'profit' ? 'profit' : growthClass === 'loss' ? 'loss' : 'text-secondary'})">${growth}</td>
+      <td style="color:var(--${colorVar})">${growth}</td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -728,13 +1091,30 @@ render();
 
 // 页面加载后自动刷新净值
 if (funds.length > 0) {
-  setTimeout(refreshAll, 500);
+  setTimeout(() => {
+    refreshAll().then(() => {
+      // 刷新完成后渲染分时图
+      setTimeout(() => {
+        funds.forEach(f => renderIntradayChart(f.code));
+      }, 200);
+    });
+  }, 500);
 }
 
 // 回车添加
 document.getElementById('inputCode').addEventListener('keydown', e => { if (e.key === 'Enter') addFund(); });
 document.getElementById('inputShares').addEventListener('keydown', e => { if (e.key === 'Enter') addFund(); });
 document.getElementById('inputCost').addEventListener('keydown', e => { if (e.key === 'Enter') addFund(); });
+
+// ========== 数据持久化 ==========
+function loadFunds() {
+  try {
+    funds = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch { funds = []; }
+}
+function saveFunds() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(funds));
+}
 </script>
 </body>
 </html>
