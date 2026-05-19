@@ -1144,6 +1144,16 @@ function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSector
 function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
+// 预置硅基流动 AI 配置（如未配置则写入默认值）
+(function(){
+  if(!localStorage.getItem('ai_config')){
+    localStorage.setItem('ai_config', JSON.stringify({
+      endpoint: 'https://api.siliconflow.cn/v1',
+      key: 'sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw',
+      model: 'Qwen/Qwen2.5-VL-7B-Instruct'
+    }));
+  }
+})();
 renHome();startPoll();
 </script>
 </body>
