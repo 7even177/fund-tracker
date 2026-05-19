@@ -973,7 +973,7 @@ async function startAiRecognition(){
     const hasCustom=cfg&&cfg.key&&cfg.key.length>10&&cfg.endpoint&&cfg.endpoint.startsWith('http');
     if(geminiKey){
       // 优先用 Gemini（免费）
-      const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
+      const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:mimeType,data:base64Data}}]}],generationConfig:{temperature:0.1,maxOutputTokens:2000}})
@@ -1220,15 +1220,15 @@ function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSector
 function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
-// 修正 ai_config：清除误存的 geminiKey（sk- 开头的不是 Gemini Key）
+// 强制写入正确的 ai_config（每次都更新 geminiKey，保持最新）
 (function(){
   try{
     const existing = JSON.parse(localStorage.getItem('ai_config')||'{}');
-    // 如果 geminiKey 不是 AIza 开头，清空它
-    if(existing.geminiKey && !existing.geminiKey.startsWith('AIza')){
-      existing.geminiKey = '';
-      localStorage.setItem('ai_config', JSON.stringify(existing));
-    }
+    existing.geminiKey = 'AIzaSyDvoHW_GqwF0rmsmtyvbFAgCHyRp5-B5Yg';
+    existing.endpoint = existing.endpoint || 'https://api.siliconflow.cn/v1';
+    existing.key = existing.key || '';
+    existing.model = existing.model || 'Qwen/Qwen3-VL-8B-Instruct';
+    localStorage.setItem('ai_config', JSON.stringify(existing));
   }catch(e){}
 })();
 
