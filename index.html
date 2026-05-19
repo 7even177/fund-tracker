@@ -969,20 +969,10 @@ async function startAiRecognition(){
   let content='';
 
   try{
-    if(cfg&&cfg.key&&cfg.key!=='sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw'){
-      // 用户自己配置的接口（OpenAI 兼容格式）
-      const resp=await fetch(cfg.endpoint.replace(/\/+$/,'')+'/chat/completions',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
-        body:JSON.stringify({model:cfg.model,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:ocrImageData}}]}],max_tokens:2000,temperature:0.1})
-      });
-      if(!resp.ok) throw new Error('自定义接口失败，降级到Gemini');
-      const d=await resp.json();
-      content=d.choices?.[0]?.message?.content||'';
-    } else {
-      // 默认用 Gemini Flash（免费，每天1500次）
-      const geminiKey=(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))?cfg.geminiKey:GEMINI_KEY;
-      if(!geminiKey){throw new Error('请先在设置(⚙️)中填入 Gemini API Key，前往 aistudio.google.com/apikey 免费获取')}
+    const geminiKey=(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))?cfg.geminiKey:'';
+    const hasCustom=cfg&&cfg.key&&cfg.key.length>10&&cfg.endpoint&&cfg.endpoint.startsWith('http');
+    if(geminiKey){
+      // 优先用 Gemini（免费）
       const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -991,6 +981,19 @@ async function startAiRecognition(){
       if(!resp.ok){const e=await resp.text();throw new Error('Gemini: '+e)}
       const d=await resp.json();
       content=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    } else if(hasCustom){
+      // 用户自己配置的接口（OpenAI 兼容格式）
+      const resp=await fetch(cfg.endpoint.replace(/\/+$/,'')+'/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.key},
+        body:JSON.stringify({model:cfg.model,messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image_url',image_url:{url:ocrImageData}}]}],max_tokens:2000,temperature:0.1})
+      });
+      if(!resp.ok){const e=await resp.text();throw new Error('自定义接口: '+e)}
+      const d=await resp.json();
+      content=d.choices?.[0]?.message?.content||'';
+    } else {
+      // 无可用配置
+      throw new Error('请先在设置(⚙️)中填入 Gemini API Key\n前往 aistudio.google.com/apikey 免费获取（需要 Google 账号）');
     }
 
     // Extract JSON
@@ -1217,14 +1220,16 @@ function showSecDD(){const f=gf(curCode);if(!f)return;const secs=f.relatedSector
 function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.remove('sh');renSec();const secs=gf(curCode)?.relatedSectors||[];renSecChart(secs)}
 
 /* ===== INIT ===== */
-// 预置硅基流动 AI 配置（强制更新为正确模型名）
+// 修正 ai_config：清除误存的 geminiKey（sk- 开头的不是 Gemini Key）
 (function(){
-  const existing = JSON.parse(localStorage.getItem('ai_config')||'{}');
-  localStorage.setItem('ai_config', JSON.stringify({
-    endpoint: existing.endpoint || 'https://api.siliconflow.cn/v1',
-    key: existing.key || 'sk-qjtixlefmvklyiswaaabcoqfiapiqhmhnkzrfoetgywywclw',
-    model: 'Qwen/Qwen3-VL-8B-Instruct'
-  }));
+  try{
+    const existing = JSON.parse(localStorage.getItem('ai_config')||'{}');
+    // 如果 geminiKey 不是 AIza 开头，清空它
+    if(existing.geminiKey && !existing.geminiKey.startsWith('AIza')){
+      existing.geminiKey = '';
+      localStorage.setItem('ai_config', JSON.stringify(existing));
+    }
+  }catch(e){}
 })();
 
 // 预置持仓数据（强制写入，标记版本避免重复）
