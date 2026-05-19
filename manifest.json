@@ -3,22 +3,13 @@
   "short_name": "基金追踪",
   "description": "实时基金持仓追踪，支持净值更新、收益计算",
   "start_url": "/fund-tracker/",
+  "scope": "/fund-tracker/",
   "display": "standalone",
   "background_color": "#0d0d0d",
   "theme_color": "#f0b429",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    {"src": "icon-192.png","sizes": "192x192","type": "image/png","purpose": "any maskable"},
+    {"src": "icon-512.png","sizes": "512x512","type": "image/png","purpose": "any maskable"}
   ]
 }
