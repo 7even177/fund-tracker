@@ -187,7 +187,7 @@ async function fHist(c,p,sz){return await fjp('https://api.fund.eastmoney.com/f1
 async function fIdx(code){const p=await fraw(code);if(!p||p.length<6)return null;return{name:p[1],code:p[2],price:parseFloat(p[3]),prev:parseFloat(p[4]),chp:parseFloat(p[32])||0}}
 
 /* ===== POLLING ===== */
-async function pollNav(){const d=ld();for(const f of d.funds){try{const r=await fNav(f.code);if(r){f.name=r.name||f.name;f.nav=parseFloat(r.dwjz)||f.nav;f.gsz=parseFloat(r.gsz)||null;f.gztime=r.gztime||null;f.navDate=r.jzrq||null;f.gszzl=r.gszzl!==undefined?parseFloat(r.gszzl):null}}}sv(d);if(curPg==='home')renHome();if(curPg==='detail'&&curCode)renDetail()}
+async function pollNav(){const d=ld();for(const f of d.funds){try{const r=await fNav(f.code);if(r){f.name=r.name||f.name;f.nav=parseFloat(r.dwjz)||f.nav;f.gsz=parseFloat(r.gsz)||null;f.gztime=r.gztime||null;f.navDate=r.jzrq||null;f.gszzl=r.gszzl!==undefined?parseFloat(r.gszzl):null}}catch(e){console.warn('pollNav err',f.code,e)}}sv(d);if(curPg==='home')renHome();if(curPg==='detail'&&curCode)renDetail()}
 function startPoll(){if(navTimer)clearInterval(navTimer);pollNav();navTimer=setInterval(()=>{const h=new Date().getHours();if(h>=9&&h<15)pollNav()},30000)}
 function stopPoll(){if(navTimer){clearInterval(navTimer);navTimer=null}}
 
