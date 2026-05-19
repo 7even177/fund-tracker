@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>基金持仓追踪</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0d0f14;--card:#181a20;--card2:#1e2028;--input:#2a2d36;--text:#e8e8e8;--text2:#8a8d98;--accent:#f7a239;--red:#e74c3c;--green:#2ecc71;--redbg:rgba(231,76,60,.12);--greenbg:rgba(46,204,113,.12);--blue:#3498db;--border:#2a2d36;--shadow:0 2px 12px rgba(0,0,0,.4)}
@@ -169,7 +169,7 @@ html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Ro
 </head>
 <body>
 <div id="pg-home" class="page active">
-  <div class="hdr"><h1>💰 基金持仓</h1></div>
+  <div class="hdr"><span style="width:36px"></span><h1>💰 基金持仓</h1><span style="font-size:20px;cursor:pointer;padding:4px 8px" onclick="showSettings()">⚙️</span></div>
   <div class="ov" id="ov">
     <div class="lb">总资产（元）</div>
     <div class="total" id="ta">--</div>
@@ -767,99 +767,328 @@ function showMore(){
 }
 function delFund(c){if(!confirm('确认删除此基金？所有数据将不可恢复。'))return;const d=ld();d.funds=d.funds.filter(f=>f.code!==c);sv(d);hModal();goHome()}
 
-/* ===== OCR Screenshot Import ===== */
+/* ===== AI Settings ===== */
+function getAiConfig(){try{const c=JSON.parse(localStorage.getItem('ai_config'));return c}catch(e){}return null}
+function saveAiConfig(endpoint,key,model){localStorage.setItem('ai_config',JSON.stringify({endpoint,key,model}))}
+
+function showSettings(){
+  const cfg=getAiConfig()||{endpoint:'https://api.openai.com/v1',key:'',model:'gpt-4o'};
+  modal(`<h3>⚙️ AI 接口设置</h3>
+<div class="fg"><label>接口地址</label><input id="s-ep" value="${eh(cfg.endpoint)}" placeholder="https://api.openai.com/v1" /></div>
+<div class="fg"><label>API Key</label><input id="s-key" value="${eh(cfg.key)}" placeholder="sk-..." type="password" /></div>
+<div class="fg"><label>模型</label><input id="s-model" value="${eh(cfg.model)}" placeholder="gpt-4o" /></div>
+<div class="br"><button class="bx" onclick="hModal()">取消</button><button class="bc" onclick="doSaveSettings()">保存</button></div>`);
+}
+function doSaveSettings(){
+  const ep=document.getElementById('s-ep').value.trim();
+  const key=document.getElementById('s-key').value.trim();
+  const model=document.getElementById('s-model').value.trim();
+  if(!ep||!key||!model){alert('请填写完整信息');return}
+  saveAiConfig(ep,key,model);
+  hModal();
+  // If currently on OCR modal, refresh it
+  const ocrBtn=document.getElementById('ocr-ai-btn');
+  if(ocrBtn)ocrBtn.style.display='block';
+}
+
+/* ===== Fund Code Search ===== */
+async function searchFundCode(name){
+  try{
+    const url=`https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?callback=jQuery&m=1&key=${encodeURIComponent(name)}&_=${Date.now()}`;
+    const proxyUrl=`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const resp=await fetch(proxyUrl);
+    const text=await resp.text();
+    const match=text.match(/jQuery\w*\((\{.*\})\)/s);
+    if(match){
+      const data=JSON.parse(match[1]);
+      if(data.Datas&&data.Datas.length>0){
+        return data.Datas[0].CODE;
+      }
+    }
+  }catch(e){console.warn('searchFundCode failed',name,e)}
+  return null;
+}
+
+/* ===== AI Vision Screenshot Import ===== */
+let ocrImageData=null;
+let ocrResults=[];
+
 function showOcrImport(){
-  modal(`<h3>📷 支付宝截图识别</h3>
+  const cfg=getAiConfig();
+  modal(`<h3>📷 支付宝截图批量导入</h3>
 <div class="upload-zone" id="uz" onclick="document.getElementById('ocr-file').click()">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;opacity:.4;margin-bottom:8px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
 <p>点击或拖拽上传支付宝截图</p>
+<p style="font-size:11px;margin-top:4px;color:var(--text2)">支持拖拽上传</p>
 <input type="file" id="ocr-file" accept="image/*" onchange="handleOcrFile(this)" />
 </div>
-<div id="ocr-status" class="ocr-status" style="display:none"></div>
-<div id="ocr-result" style="display:none">
-<div class="fg"><label>基金名称</label><input id="ocr-name" placeholder="识别的基金名称" /></div>
-<div class="fg"><label>基金代码</label><input id="ocr-code" placeholder="6位基金代码" /></div>
-<div class="fg"><label>持仓金额（元）</label><input id="ocr-amount" type="number" placeholder="持有金额" /></div>
-<div class="fg"><label>成本净值</label><input id="ocr-cost" type="number" step="0.0001" placeholder="成本净值" /></div>
-<div class="fg"><label>持有收益（元）</label><input id="ocr-profit" type="number" placeholder="持有收益" /></div>
+<div id="ocr-preview" style="display:none;text-align:center;margin-bottom:12px">
+<img id="ocr-img" style="max-width:100%;max-height:200px;border-radius:8px" />
 </div>
-<div class="br"><button class="bx" onclick="hModal()">取消</button><button class="bc" id="ocr-add-btn" onclick="confirmOcrAdd()" style="display:none">确认添加</button></div>`);
+<div id="ocr-status" style="text-align:center;padding:12px;color:var(--text2);font-size:13px;display:none"></div>
+${cfg&&cfg.key?`<button id="ocr-ai-btn" onclick="startAiRecognition()" style="width:100%;padding:12px;background:var(--accent);color:#000;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;margin-bottom:12px">🔍 开始识别</button>`:`<div style="text-align:center;padding:8px;color:var(--red);font-size:13px;margin-bottom:12px">⚠️ 需要配置 AI 接口（点击右上角⚙️设置）</div>`}
+<div id="ocr-result" style="display:none">
+<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px">
+<thead><tr style="color:var(--text2);border-bottom:1px solid var(--border)"><th style="padding:8px 4px;text-align:left">基金名称</th><th style="padding:8px 4px;text-align:left">代码</th><th style="padding:8px 4px">持有金额</th><th style="padding:8px 4px">日收益</th><th style="padding:8px 4px">持有收益</th><th style="padding:8px 4px">操作</th></tr></thead>
+<tbody id="ocr-tbody"></tbody>
+</table>
+</div>
+<div class="br"><button class="bx" onclick="hModal()">取消</button><button class="bc" id="ocr-import-all" onclick="importAllOcr()" style="display:none">全部导入 (${ocrResults.length})</button></div>`);
   // drag & drop
   setTimeout(()=>{
     const uz=document.getElementById('uz');
     if(uz){
       uz.ondragover=e=>{e.preventDefault();uz.classList.add('dragover')};
       uz.ondragleave=()=>uz.classList.remove('dragover');
-      uz.ondrop=e=>{e.preventDefault();uz.classList.remove('dragover');const f=e.dataTransfer.files;if(f.length)runOcr(f[0])};
+      uz.ondrop=e=>{e.preventDefault();uz.classList.remove('dragover');const f=e.dataTransfer.files;if(f.length)previewOcrFile(f[0])};
     }
   },100);
 }
-function handleOcrFile(el){if(el.files.length)runOcr(el.files[0])}
+function handleOcrFile(el){if(el.files.length)previewOcrFile(el.files[0])}
 
-async function runOcr(file){
+function previewOcrFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    ocrImageData=e.target.result;
+    const prev=document.getElementById('ocr-preview');
+    const img=document.getElementById('ocr-img');
+    if(prev)prev.style.display='block';
+    if(img)img.src=ocrImageData;
+    // Auto-start recognition if AI config exists
+    const cfg=getAiConfig();
+    if(cfg&&cfg.key)startAiRecognition();
+  };
+  reader.readAsDataURL(file);
+}
+
+async function startAiRecognition(){
+  const cfg=getAiConfig();
+  if(!cfg||!cfg.key){alert('请先配置 AI 接口');return}
+  if(!ocrImageData){alert('请先上传图片');return}
+
   const statusEl=document.getElementById('ocr-status');
   const resultEl=document.getElementById('ocr-result');
-  const addBtn=document.getElementById('ocr-add-btn');
-  if(!statusEl||!resultEl)return;
-  statusEl.style.display='block';
-  statusEl.innerHTML='<div>⏳ 识别中，请稍候...</div>';
-  resultEl.style.display='none';addBtn.style.display='none';
+  const importBtn=document.getElementById('ocr-import-all');
+  const aiBtn=document.getElementById('ocr-ai-btn');
+  if(statusEl){statusEl.style.display='block';statusEl.innerHTML='<div>⏳ AI 识别中，请稍候（约10-30秒）...</div>'}
+  if(resultEl)resultEl.style.display='none';
+  if(importBtn)importBtn.style.display='none';
+  if(aiBtn)aiBtn.disabled=true;
+
+  // Extract base64 from data URL
+  const base64Data=ocrImageData.split(',')[1];
+  const mimeType=ocrImageData.split(',')[0].match(/data:(.*?);/)?.[1]||'image/png';
+
+  const systemPrompt=`请识别这张支付宝基金持仓截图，提取所有基金信息。
+返回纯JSON数组格式，每个元素包含：
+- name: 基金全名（字符串）
+- amount: 持有金额（数字，不要带单位）
+- dayReturn: 日收益（数字，可以是负数）
+- holdReturn: 持有收益（数字，可以是负数）
+- ratio: 占比（字符串，如"15.2%"）
+
+只返回JSON数组，不要其他任何文字。如果没有识别到基金信息，返回空数组[]。`;
 
   try{
-    const worker=await Tesseract.createWorker('chi_sim+eng');
-    const{data:{text}}=await worker.recognize(file);
-    await worker.terminate();
-    statusEl.innerHTML='<div>✅ 识别完成</div>';
+    const resp=await fetch(cfg.endpoint.replace(/\/+$/,'')+'/chat/completions',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':'Bearer '+cfg.key
+      },
+      body:JSON.stringify({
+        model:cfg.model,
+        messages:[
+          {role:'system',content:systemPrompt},
+          {role:'user',content:[
+            {type:'text',text:'请识别这张支付宝基金持仓截图中的所有基金信息，返回JSON数组。'},
+            {type:'image_url',image_url:{url:ocrImageData}}
+          ]}
+        ],
+        max_tokens:2000,
+        temperature:0.1
+      })
+    });
 
-    // Parse fund code (6 digits)
-    const codeMatch=text.match(/(\d{6})/);
-    const fundCode=codeMatch?codeMatch[1]:'';
+    if(!resp.ok){
+      const errText=await resp.text();
+      throw new Error(`API请求失败 (${resp.status}): ${errText}`);
+    }
 
-    // Parse amount - patterns like 持有金额 10,000.00 or 持有金额¥10000
-    const amtMatch=text.match(/持有金额[^0-9]*(\d[\d,]*\.?\d*)/);
-    const fundAmount=amtMatch?parseFloat(amtMatch[1].replace(/,/g,'')):'';
+    const data=await resp.json();
+    let content=data.choices?.[0]?.message?.content||'';
 
-    // Parse profit - patterns like 持有收益 +1,000.00 or 持有收益 -500.00
-    const profitMatch=text.match(/持有收益[^\d-]*([+-]?\d[\d,]*\.?\d*)/);
-    const fundProfit=profitMatch?parseFloat(profitMatch[1].replace(/,/g,'')):'';
+    // Extract JSON from response (handle markdown code blocks)
+    const jsonMatch=content.match(/\[[\s\S]*\]/);
+    if(jsonMatch){
+      content=jsonMatch[0];
+    }
 
-    // Parse cost NAV - patterns like 成本净值 1.234 or 买入均价 1.234
-    const costMatch=text.match(/(?:成本净值|买入均价|持仓成本价)[^0-9]*(\d+\.?\d*)/);
-    const costNav=costMatch?parseFloat(costMatch[1]):'';
+    const funds=JSON.parse(content);
+    if(!Array.isArray(funds)||funds.length===0){
+      throw new Error('未能识别到基金信息');
+    }
 
-    // Fund name - try to extract first meaningful line before the code
-    const lines=text.split('\n').map(l=>l.trim()).filter(l=>l.length>1&&l.length<30&&!/^\d/.test(l)&&!/[¥元%]/.test(l));
-    const fundName=lines.length>0?lines[0]:'';
+    ocrResults=funds.map(f=>({
+      name:f.name||'',
+      code:'',
+      codeStatus:'searching',
+      amount:f.amount||0,
+      dayReturn:f.dayReturn||0,
+      holdReturn:f.holdReturn||0,
+      ratio:f.ratio||''
+    }));
 
-    resultEl.style.display='block';addBtn.style.display='block';
-    document.getElementById('ocr-code').value=fundCode;
-    document.getElementById('ocr-amount').value=fundAmount;
-    document.getElementById('ocr-cost').value=costNav;
-    document.getElementById('ocr-profit').value=fundProfit;
+    // Update status
+    if(statusEl)statusEl.innerHTML=`<div>✅ 识别到 ${funds.length} 只基金，正在搜索基金代码...</div>`;
 
-    // Auto-fetch fund name from code
-    if(fundCode){
-      const navData=await fNav(fundCode);
-      if(navData&&navData.name){document.getElementById('ocr-name').value=navData.name}
-      else if(fundName){document.getElementById('ocr-name').value=fundName}
-    }else if(fundName){document.getElementById('ocr-name').value=fundName}
+    // Render table
+    renderOcrTable();
+    if(resultEl)resultEl.style.display='block';
+
+    // Search fund codes in parallel
+    const searchPromises=ocrResults.map(async(fund,idx)=>{
+      if(fund.name){
+        const code=await searchFundCode(fund.name);
+        ocrResults[idx].code=code||'';
+        ocrResults[idx].codeStatus=code?'found':'not_found';
+      }
+      updateOcrRow(idx);
+    });
+    await Promise.all(searchPromises);
+
+    if(statusEl)statusEl.innerHTML=`<div>✅ 识别完成，共 ${ocrResults.length} 只基金</div>`;
+    if(importBtn){importBtn.style.display='block';importBtn.textContent=`全部导入 (${ocrResults.length})`}
+
   }catch(e){
-    console.error('OCR error:',e);
-    statusEl.innerHTML='<div>❌ 识别失败，请手动填写</div><div style="font-size:12px;margin-top:4px">'+e.message+'</div>';
-    resultEl.style.display='block';addBtn.style.display='block';
+    console.error('AI recognition error:',e);
+    if(statusEl)statusEl.innerHTML=`<div style="color:var(--red)">❌ 识别失败: ${eh(e.message)}</div>`;
+  }finally{
+    if(aiBtn)aiBtn.disabled=false;
   }
 }
 
-function confirmOcrAdd(){
-  const code=document.getElementById('ocr-code').value.trim();
-  const name=document.getElementById('ocr-name').value.trim();
-  const amt=parseFloat(document.getElementById('ocr-amount').value)||0;
-  const cost=parseFloat(document.getElementById('ocr-cost').value)||0;
-  if(!code||amt<=0){alert('请至少填写基金代码和持仓金额');return}
-  const nav=cost||1;const shares=amt/nav;
-  const data=ld();if(data.funds.find(f=>f.code===code)){alert('该基金已存在');return}
-  data.funds.push({code,name:name||code,shares,cost:cost||nav,addDate:td(),investAmount:amt,trades:[{id:uid(),date:td(),type:'buy',shares,price:cost||nav,amount:amt}],relatedSectors:[],holdings:[],nav:null,gsz:null,gztime:null,navDate:null,gszzl:null,historyNav:[]});
-  sv(data);hModal();renHome();pollNav();
+function renderOcrTable(){
+  const tbody=document.getElementById('ocr-tbody');
+  if(!tbody)return;
+  tbody.innerHTML=ocrResults.map((f,i)=>`
+<tr id="ocr-row-${i}" style="border-bottom:1px solid var(--border)">
+  <td style="padding:8px 4px"><input value="${eh(f.name)}" style="width:100%;background:var(--input);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px" onchange="ocrResults[${i}].name=this.value" /></td>
+  <td style="padding:8px 4px;min-width:70px"><span id="ocr-code-${i}" style="font-size:12px">${f.code?f.code:'搜索中...'}</span></td>
+  <td style="padding:8px 4px;text-align:center"><input type="number" value="${f.amount}" style="width:80px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px;text-align:center" onchange="ocrResults[${i}].amount=parseFloat(this.value)||0" /></td>
+  <td style="padding:8px 4px;text-align:center"><input type="number" value="${f.dayReturn}" style="width:70px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px;text-align:center" onchange="ocrResults[${i}].dayReturn=parseFloat(this.value)||0" /></td>
+  <td style="padding:8px 4px;text-align:center"><input type="number" value="${f.holdReturn}" style="width:70px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:4px 6px;border-radius:4px;font-size:12px;text-align:center" onchange="ocrResults[${i}].holdReturn=parseFloat(this.value)||0" /></td>
+  <td style="padding:8px 4px;text-align:center"><span style="cursor:pointer;font-size:16px" onclick="removeOcrRow(${i})">🗑</span></td>
+</tr>`).join('');
+}
+
+function updateOcrRow(idx){
+  const codeEl=document.getElementById('ocr-code-'+idx);
+  if(codeEl){
+    const f=ocrResults[idx];
+    if(f.codeStatus==='found'){
+      codeEl.textContent=f.code;
+      codeEl.style.color='var(--green)';
+    }else if(f.codeStatus==='not_found'){
+      codeEl.textContent='未找到';
+      codeEl.style.color='var(--red)';
+    }else{
+      codeEl.textContent='搜索中...';
+      codeEl.style.color='var(--text2)';
+    }
+  }
+}
+
+function removeOcrRow(idx){
+  ocrResults.splice(idx,1);
+  renderOcrTable();
+  const importBtn=document.getElementById('ocr-import-all');
+  if(importBtn){importBtn.textContent=`全部导入 (${ocrResults.length})`}
+  if(ocrResults.length===0){
+    const resultEl=document.getElementById('ocr-result');
+    if(resultEl)resultEl.style.display='none';
+    if(importBtn)importBtn.style.display='none';
+  }
+}
+
+async function importAllOcr(){
+  if(!ocrResults.length)return;
+  const statusEl=document.getElementById('ocr-status');
+  const importBtn=document.getElementById('ocr-import-all');
+  if(importBtn){importBtn.disabled=true;importBtn.textContent='导入中...'}
+  if(statusEl)statusEl.innerHTML='<div>⏳ 正在导入...</div>';
+
+  let imported=0,skipped=0;
+  const data=ld();
+
+  for(const fund of ocrResults){
+    if(!fund.name&&!fund.code)continue;
+
+    let code=fund.code;
+    let name=fund.name;
+
+    // If no code, try to find it
+    if(!code&&name){
+      code=await searchFundCode(name);
+    }
+
+    // If still no code, try to fetch from name via fNav
+    if(!code){
+      // Use name as-is, user can edit later
+      code=null;
+    }
+
+    // Check if fund already exists
+    if(code&&data.funds.find(f=>f.code===code)){
+      skipped++;
+      continue;
+    }
+
+    // If we have a code, verify name via fNav
+    if(code){
+      try{
+        const navData=await fNav(code);
+        if(navData){
+          name=navData.name||name;
+        }
+      }catch(e){}
+    }
+
+    if(!code){
+      // Generate a temporary code from name hash
+      code='tmp_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
+    }
+
+    const costNav=fund.amount>0&&fund.holdReturn!==undefined?fund.amount/(fund.amount+fund.holdReturn)*1:1;
+    const shares=fund.amount>0?fund.amount/Math.max(costNav,0.0001):0;
+
+    data.funds.push({
+      code,
+      name:name||code,
+      shares:shares,
+      cost:costNav,
+      addDate:td(),
+      investAmount:fund.amount,
+      trades:[{id:uid(),date:td(),type:'buy',shares,price:costNav,amount:fund.amount}],
+      relatedSectors:[],
+      holdings:[],
+      nav:null,gsz:null,gztime:null,navDate:null,gszzl:null,historyNav:[]
+    });
+
+    imported++;
+    if(statusEl)statusEl.innerHTML=`<div>⏳ 已导入 ${imported}/${ocrResults.length}...</div>`;
+  }
+
+  sv(data);
+
+  if(statusEl)statusEl.innerHTML=`<div style="color:var(--green)">✅ 导入完成！成功 ${imported} 只${skipped>0?'，跳过 '+skipped+' 只已存在的':''}</div>`;
+  if(importBtn){importBtn.textContent='✅ 导入完成';importBtn.style.background='var(--green)'}
+
+  setTimeout(()=>{
+    hModal();
+    renHome();
+    pollNav();
+  },1500);
 }
 
 /* ===== Danmaku ===== */
