@@ -462,22 +462,29 @@ function renHome(){
   }
   let ta=0,tc=0,tdpVal=0;
   fs.forEach(f=>{
-    const n=f.gsz||f.nav||0,co=f.investAmount??(f.shares||0)*(f.cost||0),pct=f.gszzl||0;
-    const mv=co/(f.cost||n||1)*n;ta+=mv;tc+=co;tdpVal+=mv*pct/100;
+    const realNav=f.gsz||f.nav||0;
+    // 投入成本：优先用 investAmount，否则用份额×成本净值
+    const co=f.investAmount>0?f.investAmount:(f.shares||0)*(f.cost||1);
+    // 市值：有真实净值则用净值×份额，否则用投入金额（净值未加载时的占位）
+    const mv=realNav>0&&f.shares>0?f.shares*realNav:co;
+    const pct=f.gszzl||0;
+    ta+=mv;tc+=co;
+    tdpVal+=realNav>0?mv*pct/100:0; // 当日收益只在有净值时计算
   });
   const tp=ta-tc,tpr=tc>0?tp/tc*100:0,tdr=ta>0?tdpVal/ta*100:0;
   document.getElementById('ta').textContent=fmt(ta);
   setT('tp',tp);setT('tpr',tpr,'%');setT('tdp',tdpVal);setT('tdpr',tdr,'%');
   const fundsHtml = `<div class="fl-wrap">${fs.map(f=>{
-    const nav = f.gsz||f.nav||0;
-    const mv = nav>0 ? f.shares*nav : 0;
-    const ret = mv>0&&f.investAmount>0 ? mv-f.investAmount : null;
-    const retPct = ret!==null&&f.investAmount>0 ? ret/f.investAmount*100 : null;
-    const chgStr = f.gszzl!=null ? `${f.gszzl>0?'+':''}${f.gszzl.toFixed(2)}%` : '--';
-    const chgColor = f.gszzl==null?'var(--text2)':(f.gszzl>=0?'var(--red)':'var(--green)');
-    const retColor = ret===null?'var(--text2)':(ret>=0?'var(--red)':'var(--green)');
-    const retStr = ret!==null ? `${ret>=0?'+':''}¥${Math.abs(ret).toFixed(2)}` : '--';
-    const retPctStr = retPct!==null ? `${retPct>=0?'+':''}${retPct.toFixed(2)}%` : '';
+    const realNav=f.gsz||f.nav||0;
+    const co=f.investAmount>0?f.investAmount:(f.shares||0)*(f.cost||1);
+    const mv=realNav>0&&f.shares>0?f.shares*realNav:co;
+    const ret=realNav>0?mv-co:null; // 净值未加载时不显示收益
+    const retPct=ret!==null&&co>0?ret/co*100:null;
+    const chgStr=f.gszzl!=null?`${f.gszzl>0?'+':''}${f.gszzl.toFixed(2)}%`:'--';
+    const chgColor=f.gszzl==null?'var(--text2)':(f.gszzl>=0?'var(--red)':'var(--green)');
+    const retColor=ret===null?'var(--text2)':(ret>=0?'var(--red)':'var(--green)');
+    const retStr=ret!==null?`${ret>=0?'+':''}¥${Math.abs(ret).toFixed(2)}`:'--';
+    const retPctStr=retPct!==null?`${retPct>=0?'+':''}${retPct.toFixed(2)}%`:'';
     return `<div class="fl-row" onclick="goDetail('${f.code}')">
   <div class="fl-left">
     <div class="fl-name">${eh(f.name||f.code)}</div>
