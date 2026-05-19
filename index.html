@@ -769,22 +769,28 @@ function delFund(c){if(!confirm('确认删除此基金？所有数据将不可�
 
 /* ===== AI Settings ===== */
 function getAiConfig(){try{const c=JSON.parse(localStorage.getItem('ai_config'));return c}catch(e){}return null}
-function saveAiConfig(endpoint,key,model){localStorage.setItem('ai_config',JSON.stringify({endpoint,key,model}))}
+function saveAiConfig(endpoint,key,model,geminiKey){localStorage.setItem('ai_config',JSON.stringify({endpoint,key,model,geminiKey:geminiKey||''}))}
 
 function showSettings(){
-  const cfg=getAiConfig()||{endpoint:'https://api.siliconflow.cn/v1',key:'',model:'Qwen/Qwen3-VL-8B-Instruct'};
-  modal(`<h3>⚙️ AI 接口设置</h3>
+  const cfg=getAiConfig()||{endpoint:'https://api.siliconflow.cn/v1',key:'',model:'Qwen/Qwen3-VL-8B-Instruct',geminiKey:''};
+  modal(`<h3>⚙️ 识图设置</h3>
+<div style="background:rgba(247,162,57,.1);border:1px solid var(--accent);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--text2)">
+📷 <b style="color:var(--accent)">推荐：Gemini 免费识图</b><br>
+去 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--accent)">aistudio.google.com/apikey</a> 免费获取 Key，粘贴到下方第一行即可。
+</div>
+<div class="fg"><label>🆓 Gemini API Key（免费，推荐）</label><input id="s-gkey" value="${eh(cfg.geminiKey||'')}" placeholder="AIzaSy..." type="password" /></div>
+<div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px;font-size:12px;color:var(--text2)">— 或使用自定义 AI 接口 —</div>
 <div class="fg"><label>接口地址</label><input id="s-ep" value="${eh(cfg.endpoint)}" placeholder="https://api.openai.com/v1" /></div>
 <div class="fg"><label>API Key</label><input id="s-key" value="${eh(cfg.key)}" placeholder="sk-..." type="password" /></div>
 <div class="fg"><label>模型</label><input id="s-model" value="${eh(cfg.model)}" placeholder="gpt-4o" /></div>
 <div class="br"><button class="bx" onclick="hModal()">取消</button><button class="bc" onclick="doSaveSettings()">保存</button></div>`);
 }
 function doSaveSettings(){
+  const gkey=document.getElementById('s-gkey').value.trim();
   const ep=document.getElementById('s-ep').value.trim();
   const key=document.getElementById('s-key').value.trim();
   const model=document.getElementById('s-model').value.trim();
-  if(!ep||!key||!model){alert('请填写完整信息');return}
-  saveAiConfig(ep,key,model);
+  saveAiConfig(ep,key,model,gkey);
   hModal();
   // If currently on OCR modal, refresh it
   const ocrBtn=document.getElementById('ocr-ai-btn');
@@ -892,7 +898,7 @@ function previewOcrFile(file){
 }
 
 // 免费 Gemini API Key（Google 免费额度，每天1500次）
-const GEMINI_KEY='AIzaSyD-9tSrke72I6gHbMtnMf7V6N7LCZJvnM0'; // 公共演示Key，失效请在设置中配置自己的
+const GEMINI_KEY=''; // 在设置中填入你的 Gemini API Key
 
 async function startAiRecognition(){
   if(!ocrImageData){alert('请先上传图片');return}
@@ -933,7 +939,8 @@ async function startAiRecognition(){
       content=d.choices?.[0]?.message?.content||'';
     } else {
       // 默认用 Gemini Flash（免费，每天1500次）
-      const geminiKey=cfg?.geminiKey||GEMINI_KEY;
+      const geminiKey=(cfg?.geminiKey&&cfg.geminiKey.startsWith('AIza'))?cfg.geminiKey:GEMINI_KEY;
+      if(!geminiKey){throw new Error('请先在设置(⚙️)中填入 Gemini API Key，前往 aistudio.google.com/apikey 免费获取')}
       const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -1178,33 +1185,38 @@ function selSecDD(i){curSecIdx=i;document.getElementById('sec-dd').classList.rem
   }));
 })();
 
-// 预置持仓数据（如果还没有数据则写入）
+// 预置持仓数据（强制写入，标记版本避免重复）
 (function(){
+  const PRESET_VER = 'preset_v2';
+  if(localStorage.getItem(PRESET_VER)) return; // 已写入过则跳过
+  const today = '2026-05-19';
+  const preset = [
+    {code:'270042',name:'南方纳斯达克100指数(QDII)C',    investAmount:498.14},
+    {code:'016816',name:'博时上证科创板人工智能ETF联接C',  investAmount:1174.25},
+    {code:'050025',name:'博时标普500ETF联接(QDII)C',     investAmount:30.03},
+    {code:'400015',name:'泰信发展主题混合',               investAmount:0.01},
+    {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C', investAmount:200.00},
+    {code:'016874',name:'鹏华创新未来混合(LOF)C',         investAmount:4254.73},
+    {code:'010766',name:'广发远见智选混合C',               investAmount:100.00},
+  ];
   const d = ld();
-  if(d.funds.length === 0){
-    const today = '2026-05-19';
-    const preset = [
-      {code:'270042',name:'南方纳斯达克100指数(QDII)C',    investAmount:498.14, nav:1.0},
-      {code:'016816',name:'博时上证科创板人工智能ETF联接C',  investAmount:1174.25,nav:1.0},
-      {code:'050025',name:'博时标普500ETF联接(QDII)C',     investAmount:30.03,  nav:1.0},
-      {code:'400015',name:'泰信发展主题混合',               investAmount:0.01,   nav:1.0},
-      {code:'015311',name:'华夏上证科创板半导体材料设备主题ETF联接C', investAmount:200.00, nav:1.0},
-      {code:'016874',name:'鹏华创新未来混合(LOF)C',         investAmount:4254.73,nav:1.0},
-    ];
-    preset.forEach(p=>{
-      const shares = p.investAmount / p.nav;
-      d.funds.push({
-        code:p.code, name:p.name,
-        shares:shares, cost:p.nav,
-        investAmount:p.investAmount,
-        addDate:today,
-        trades:[{id:uid(),date:today,type:'buy',shares:shares,price:p.nav,amount:p.investAmount}],
-        relatedSectors:[], holdings:[],
-        nav:null, gsz:null, gztime:null, navDate:null, gszzl:null, historyNav:[]
-      });
+  const existCodes = d.funds.map(f=>f.code);
+  preset.forEach(p=>{
+    if(existCodes.includes(p.code)) return; // 已存在则跳过
+    const nav = 1.0;
+    const shares = p.investAmount / nav;
+    d.funds.push({
+      code:p.code, name:p.name,
+      shares:shares, cost:nav,
+      investAmount:p.investAmount,
+      addDate:today,
+      trades:[{id:uid(),date:today,type:'buy',shares:shares,price:nav,amount:p.investAmount}],
+      relatedSectors:[], holdings:[],
+      nav:null, gsz:null, gztime:null, navDate:null, gszzl:null, historyNav:[]
     });
-    sv(d);
-  }
+  });
+  sv(d);
+  localStorage.setItem(PRESET_VER, '1');
 })();
 
 renHome();startPoll();
